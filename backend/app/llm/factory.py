@@ -9,6 +9,12 @@ def get_llm_provider() -> BaseLLMProvider:
 
     if provider == "mock":
         return MockLLMProvider()
+    elif provider == "gemini":
+        from app.llm.gemini_provider import GeminiLLMProvider
+        api_key = settings.LLM_API_KEY or settings.OPENAI_API_KEY
+        base_url = settings.LLM_BASE_URL or "https://generativelanguage.googleapis.com/v1beta"
+        model = settings.LLM_MODEL or "gemini-1.5-flash"
+        return GeminiLLMProvider(api_key=api_key, model_name=model, base_url=base_url)
     elif provider in {"openai", "openrouter", "groq"}:
         from app.llm.openai_provider import OpenAILLMProvider
         api_key = settings.LLM_API_KEY or settings.OPENAI_API_KEY

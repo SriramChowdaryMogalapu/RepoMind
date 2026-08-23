@@ -22,24 +22,24 @@ class Settings(BaseSettings):
     DB_ECHO: bool = False
 
     # --------------------------------------------------------------------------
-    # Optional GitHub Token (Recommended for rate limits, optional for public repos)
+    # Optional GitHub Token
     # --------------------------------------------------------------------------
     GITHUB_TOKEN: Optional[str] = None
 
     # --------------------------------------------------------------------------
-    # AI Provider Selection
+    # AI Provider & Model Configuration
     # --------------------------------------------------------------------------
-    EMBEDDING_PROVIDER: str = "mock"  # Options: "mock", "fastembed", "openai"
-    EMBEDDING_MODEL: str = "text-embedding-3-small"
-    EMBEDDING_BATCH_SIZE: int = 64
+    # Embeddings: "mock", "fastembed", "openai", "gemini"
+    EMBEDDING_PROVIDER: str = "mock"
+    EMBEDDING_MODEL: str = "gemini-embedding-001"
+    EMBEDDING_BATCH_SIZE: int = 32
 
-    LLM_PROVIDER: str = "mock"        # Options: "mock", "openai", "openrouter", "groq", "anthropic"
-    LLM_MODEL: str = "gpt-4o-mini"
-    LLM_BASE_URL: str = "https://api.openai.com/v1"
+    # LLM: "mock", "openai", "openrouter", "groq", "anthropic", "gemini"
+    LLM_PROVIDER: str = "mock"
+    LLM_MODEL: str = "gemini-1.5-flash"
+    LLM_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
 
-    # --------------------------------------------------------------------------
-    # Conditional Secrets (Required ONLY if non-mock/cloud providers are enabled)
-    # --------------------------------------------------------------------------
+    # API Keys (Loaded from .env)
     LLM_API_KEY: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
 
@@ -70,12 +70,9 @@ class Settings(BaseSettings):
                 "Please configure a valid PostgreSQL connection string."
             )
 
-        # 2. GitHub Token is purely optional (warn in debug mode only)
-        # Allows unauthenticated public GitHub crawling up to standard IP limits
-
-        # 3. Validate LLM Secret conditionally
+        # 2. Validate LLM Secret conditionally
         llm_provider = (self.LLM_PROVIDER or "").lower().strip()
-        cloud_llm_providers = {"openai", "openrouter", "groq", "anthropic"}
+        cloud_llm_providers = {"openai", "openrouter", "groq", "anthropic", "gemini"}
 
         if llm_provider in cloud_llm_providers:
             active_key = (self.LLM_API_KEY or "").strip() or (self.OPENAI_API_KEY or "").strip()
@@ -85,9 +82,9 @@ class Settings(BaseSettings):
                     "which requires an API key. Please provide 'LLM_API_KEY' (or 'OPENAI_API_KEY') in your .env file."
                 )
 
-        # 4. Validate Embedding Secret conditionally
+        # 3. Validate Embedding Secret conditionally
         emb_provider = (self.EMBEDDING_PROVIDER or "").lower().strip()
-        cloud_emb_providers = {"openai", "cloud"}
+        cloud_emb_providers = {"openai", "cloud", "gemini"}
 
         if emb_provider in cloud_emb_providers:
             active_key = (self.LLM_API_KEY or "").strip() or (self.OPENAI_API_KEY or "").strip()

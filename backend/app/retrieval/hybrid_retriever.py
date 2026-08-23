@@ -102,12 +102,19 @@ class HybridRetriever(BaseRetriever):
         rows = result.all()
 
         candidates = []
+        # Check if query asks for an overview or project summary
+        is_overview_query = any(w in query.lower() for w in ["purpose", "what is", "overview", "explain", "architecture", "about"])
         for chunk, file_path, file_language in rows:
             # Score based on exact identifier occurrence count
             exact_matches = sum(1 for t in terms if t.lower() in chunk.content.lower())
             symbol_bonus = 2 if chunk.symbol_name and any(t.lower() == chunk.symbol_name.lower() for t in terms) else 0
-            raw_score = exact_matches + symbol_bonus
+            
+            # Boost documentation files for overview-style questions
+            doc_bonus = 0
+            if is_overview_query and any(file_path.lower().endswith(doc) for doc in ["readme.md", "package.json", "pyproject.toml", "cargo.toml"]):
+                doc_bonus = 5
 
+            raw_score = exact_matches + symbol_bonus + doc_bonus
             candidates.append(
                 RetrievedChunk(
                     chunk_id=chunk.id,
