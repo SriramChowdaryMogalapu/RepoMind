@@ -11,7 +11,6 @@ import {
   getRepositoryFiles,
   triggerIndexing,
 } from '@/lib/api';
-
 import { FileTree } from '@/components/FileTree';
 import { ChatWindow } from '@/components/ChatWindow';
 
