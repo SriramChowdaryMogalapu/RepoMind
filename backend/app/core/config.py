@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     MAX_FILES: int = 5000
     MAX_FILE_SIZE_KB: int = 500
     RATE_LIMIT_PER_MINUTE: int = 60
-    CORS_ORIGINS: List[str] = ["https://repo-mind-git-main-msrc.vercel.app/"]
+    CORS_ORIGINS: List[str] = ["https://repo-mind-git-main-msrc.vercel.app"]
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
