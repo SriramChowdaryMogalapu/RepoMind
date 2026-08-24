@@ -14,7 +14,7 @@ export const Header: React.FC = () => {
         </Link>
 
         <nav className="flex items-center gap-6 text-sm">
-          <Link href="https://github.com" target="_blank" className="text-zinc-400 hover:text-white transition">
+          <Link href="https://github.com/SriramChowdaryMogalapu" target="_blank" className="text-zinc-400 hover:text-white transition">
             GitHub
           </Link>
           <Link
