@@ -7,6 +7,15 @@ from app.core.config import settings
 from app.core.errors import AppException, app_exception_handler, generic_exception_handler
 from app.core.rate_limiter import rate_limit_middleware
 from app.api.v1.api import api_router
+import logging
+import time
+from app.core.logging import setup_logging
+
+try:
+    setup_logging()
+    logger = logging.getLogger("repomind.api")
+except e as Exception:
+    print(f"Logger Setup Failed: {e}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
