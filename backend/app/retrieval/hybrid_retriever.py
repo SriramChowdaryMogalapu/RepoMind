@@ -22,6 +22,45 @@ class HybridRetriever(BaseRetriever):
         self.db = db
         self.embedding_provider = get_embedding_provider()
 
+    async def get_tagged_file_chunks(self, repository_id: UUID, file_paths: List[str]) -> List[RetrievedChunk]:
+        """Fetches chunks from specifically tagged files with highest priority score."""
+        if not file_paths:
+            return []
+
+        clean_paths = [p.strip().lstrip("/") for p in file_paths if p.strip()]
+        if not clean_paths:
+            return []
+
+        stmt = (
+            select(CodeChunk, File.path, File.language)
+            .join(File, CodeChunk.file_id == File.id)
+            .where(
+                CodeChunk.repository_id == repository_id,
+                File.path.in_(clean_paths)
+            )
+            .order_by(CodeChunk.start_line.asc())
+        )
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        return [
+            RetrievedChunk(
+                chunk_id=chunk.id,
+                repository_id=chunk.repository_id,
+                file_id=chunk.file_id,
+                file_path=file_path,
+                language=file_language or "text",
+                content=chunk.content,
+                start_line=chunk.start_line,
+                end_line=chunk.end_line,
+                symbol_name=chunk.symbol_name,
+                symbol_type=chunk.symbol_type,
+                score=1.0,  # Max score guarantees top placement
+                retrieval_method="tagged_file"
+            )
+            for chunk, file_path, file_language in rows
+        ]
+
     async def _vector_search(
         self, repository_id: UUID, query: str, limit: int, path_filter: Optional[str] = None
     ) -> List[RetrievedChunk]:

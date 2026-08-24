@@ -27,63 +27,60 @@ class ChatService:
         return f"https://github.com/{repo.owner}/{repo.name}/blob/{branch}/{clean_path}{line_fragment}"
 
     async def answer_question(self, repository_id: UUID, request: ChatRequest) -> ChatResponse:
-        stmt = select(Repository).where(Repository.id == repository_id)
-        result = await self.db.execute(stmt)
-        repo = result.scalars().first()
+        logger.info(f"Processing question for repo={repository_id}: '{request.question[:60]}...'")
 
-        if not repo:
-            raise AppException(code="REPOSITORY_NOT_FOUND", message="Repository not found.", status_code=404)
+        # 1. Fetch explicitly tagged files (if any)
+        tagged_chunks = []
+        if request.tagged_files:
+            logger.info(f"Injecting {len(request.tagged_files)} tagged files: {request.tagged_files}")
+            tagged_chunks = await self.retriever.get_tagged_file_chunks(
+                repository_id=repository_id,
+                file_paths=request.tagged_files
+            )
 
-        # 1. Retrieve hybrid candidates
-        candidates = await self.retriever.retrieve(
+        # 2. Perform hybrid retrieval for related context
+        retrieved_candidates = await self.retriever.retrieve(
             repository_id=repository_id,
             query=request.question,
-            top_k=request.top_k,
-            path_filter=request.path_filter
+            top_k=request.top_k
         )
 
-        # 2. Build context and enforce limits
-        messages, used_chunks = build_rag_messages(
-            query=request.question,
-            retrieved_chunks=candidates
-        )
+        # 3. Deduplicate (Tagged chunks take precedence)
+        seen_chunk_ids = set()
+        final_candidates = []
 
-        # 3. Generate grounded LLM response
-        llm_resp = await self.llm.generate_response(messages)
+        for chunk in tagged_chunks + retrieved_candidates:
+            if chunk.chunk_id not in seen_chunk_ids:
+                seen_chunk_ids.add(chunk.chunk_id)
+                final_candidates.append(chunk)
 
-        # 4. Construct validated source citations
-        sources: List[SourceCitation] = []
-        for chunk in used_chunks:
-            github_url = self._build_github_url(
-                repo=repo,
-                file_path=chunk.file_path,
-                start_line=chunk.start_line,
-                end_line=chunk.end_line
-            )
-            sources.append(
-                SourceCitation(
-                    file_path=chunk.file_path,
-                    start_line=chunk.start_line,
-                    end_line=chunk.end_line,
-                    symbol_name=chunk.symbol_name,
-                    language=chunk.language,
-                    github_url=github_url
-                )
-            )
+        logger.info(f"Constructing prompt with {len(final_candidates)} candidate chunks.")
 
-        # Evaluate confidence
-        if not used_chunks or "not find enough evidence" in llm_resp.content.lower():
-            confidence = "insufficient_evidence"
-        elif len(used_chunks) >= 3:
-            confidence = "high"
-        else:
-            confidence = "medium"
+        # 4. Assemble Grounded Messages & Query LLM
+        messages, used_chunks = build_rag_messages(request.question, final_candidates)
+        llm_response = await self.llm.generate_response(messages)
+
+        logger.info(f"LLM generation complete via model={llm_response.model_name}")
+
+        # 5. Build verified source links
+        repo = await self.repo_service.get_by_id(repository_id)
+        sources = [
+            {
+                "file_path": c.file_path,
+                "start_line": c.start_line,
+                "end_line": c.end_line,
+                "symbol_name": c.symbol_name,
+                "language": c.language,
+                "github_url": f"{repo.url}/blob/{repo.default_branch}/{c.file_path}#L{c.start_line}-L{c.end_line}"
+            }
+            for c in used_chunks
+        ]
 
         return ChatResponse(
             repository_id=repository_id,
             question=request.question,
-            answer=llm_resp.content,
+            answer=llm_response.content,
             sources=sources,
-            confidence=confidence,
-            model_name=llm_resp.model_name
+            confidence="high" if len(used_chunks) > 0 else "low",
+            model_name=llm_response.model_name
         )
