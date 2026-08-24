@@ -7,8 +7,8 @@ import { ChatSkeletonLoader } from './ui/LoadingStates';
 
 interface Source {
   file_path: string;
-  start_line: int;
-  end_line: int;
+  start_line: number;
+  end_line: number;
   symbol_name?: string;
   github_url: string;
 }
