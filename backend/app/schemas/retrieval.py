@@ -30,3 +30,11 @@ class RetrievalResponse(BaseModel):
     query: str
     total_candidates: int
     results: List[RetrievedChunkResponse]
+
+class ChatRequest(BaseModel):
+    question: str = Field(..., min_length=2, max_length=2000)
+    top_k: int = Field(default=6, ge=1, le=20)
+    tagged_files: Optional[List[str]] = Field(
+        default=None,
+        description="Explicitly tagged file paths to force into prompt context (e.g. ['src/auth/jwt.py'])"
+    )

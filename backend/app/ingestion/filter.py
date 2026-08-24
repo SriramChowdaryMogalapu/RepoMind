@@ -6,7 +6,7 @@ IGNORED_DIRECTORIES: Set[str] = {
     ".git", ".github", "node_modules", "dist", "build", "coverage",
     "__pycache__", ".venv", "venv", "env", "target", "vendor",
     ".next", ".cache", ".idea", ".vscode", "bin", "obj", ".turbo",
-    "out", "public", ".gradle"
+    "out", "public", ".gradle", ".pipeline"
 }
 
 IGNORED_EXTENSIONS: Set[str] = {
@@ -40,6 +40,10 @@ SUPPORTED_EXTENSIONS = {
     ".cc": "C++",
     ".cxx": "C++",
     ".c": "C",
+    ".docx": "Word",
+    ".doc": "Word",
+    ".pdf": "PDF",
+    ".ipynb": "Jupyter Notebook"
     ".h": "C/C++ Header",
     ".hpp": "C++ Header",
     ".go": "Go",
