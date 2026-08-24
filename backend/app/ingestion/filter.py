@@ -43,7 +43,7 @@ SUPPORTED_EXTENSIONS = {
     ".docx": "Word",
     ".doc": "Word",
     ".pdf": "PDF",
-    ".ipynb": "Jupyter Notebook"
+    ".ipynb": "Jupyter Notebook",
     ".h": "C/C++ Header",
     ".hpp": "C++ Header",
     ".go": "Go",
