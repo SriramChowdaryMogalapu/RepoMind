@@ -61,12 +61,12 @@ export const FileTree: React.FC<FileTreeProps> = ({ files, activeFile, onFileCli
   const treeData = buildTree(files);
 
   return (
-    <div className="h-full flex flex-col bg-zinc-950 border-r border-zinc-800 select-none text-xs">
+    <div className="flex h-full min-h-0 flex-col bg-zinc-950 border-r border-zinc-800 select-none text-xs">
       <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between text-zinc-400 font-medium">
         <span>Files ({files.length})</span>
           <span className="text-[10px] text-zinc-500">{activeFile ? 'Viewing file' : 'Click a file to view'}</span>
       </div>
-      <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+      <div className="min-h-0 flex-1 overflow-y-auto p-2 space-y-0.5">
         {treeData.map((node, i) => (
           <TreeNodeItem key={i} node={node} activeFile={activeFile} onFileClick={onFileClick} onFileTag={onFileTag} />
         ))}
