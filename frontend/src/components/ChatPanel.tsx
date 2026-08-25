@@ -2,6 +2,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { 
   Send, Sparkles, ExternalLink, Bot, User, Tag, X, FileCode, 
   Layers, Play
@@ -265,7 +267,34 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   ? 'bg-blue-600 text-white rounded-tr-none'
                   : 'bg-zinc-800/80 border border-zinc-700/60 text-zinc-200 rounded-tl-none'
               }`}>
-                <p className="whitespace-pre-wrap">{m.content}</p>
+                {m.role === 'assistant' ? (
+                  <div className="chat-markdown">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        h1: ({ children }) => <h3 className="mb-3 text-base font-bold text-white">{children}</h3>,
+                        h2: ({ children }) => <h3 className="mb-3 mt-4 text-sm font-bold text-white first:mt-0">{children}</h3>,
+                        h3: ({ children }) => <h4 className="mb-2 mt-3 text-sm font-semibold text-blue-200 first:mt-0">{children}</h4>,
+                        p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="mb-3 list-disc space-y-1 pl-5 last:mb-0">{children}</ul>,
+                        ol: ({ children }) => <ol className="mb-3 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>,
+                        li: ({ children }) => <li className="pl-1">{children}</li>,
+                        blockquote: ({ children }) => <blockquote className="my-3 border-l-2 border-blue-400/60 bg-blue-950/20 px-3 py-2 text-zinc-300">{children}</blockquote>,
+                        code: ({ className, children, ...props }) => {
+                          const isBlock = Boolean(className);
+                          return isBlock ? (
+                            <code className={`${className} block overflow-x-auto rounded-lg border border-zinc-700/80 bg-zinc-950/80 p-3 text-xs text-zinc-200`} {...props}>{children}</code>
+                          ) : <code className="rounded bg-zinc-950/60 px-1.5 py-0.5 font-mono text-[0.9em] text-blue-200" {...props}>{children}</code>;
+                        },
+                        pre: ({ children }) => <pre className="mb-3 overflow-x-auto last:mb-0">{children}</pre>,
+                        a: ({ children, href }) => <a href={href} target="_blank" rel="noreferrer" className="text-blue-300 underline decoration-blue-400/40 underline-offset-2 hover:text-blue-200">{children}</a>,
+                        strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                      }}
+                    >
+                      {m.content}
+                    </ReactMarkdown>
+                  </div>
+                ) : <p className="whitespace-pre-wrap">{m.content}</p>}
               </div>
 
               {m.sources && m.sources.length > 0 && (
