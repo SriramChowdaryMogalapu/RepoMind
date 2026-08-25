@@ -40,13 +40,20 @@ class MultiProviderFallbackLLM(BaseLLMProvider):
 
     def _generate_offline_degraded_response(self, messages: List[LLMMessage]) -> LLMResponse:
         """Extracts key code symbols and references directly from prompt context."""
-        user_question = next((m.content for m in reversed(messages) if m.role == "user"), "your query")
+        user_message = next((m.content for m in reversed(messages) if m.role == "user"), "")
+        question_marker = "USER QUESTION:"
+        user_question = user_message.split(question_marker, 1)[-1].split(
+            "Please provide a grounded answer", 1
+        )[0].strip() if question_marker in user_message else user_message.strip()
+        user_question = user_question or "your query"
         
         fallback_text = (
-            "> **Notice**: All external AI providers are temporarily unavailable. "
-            "Displaying an offline deterministic extraction from indexed repository context.\n\n"
-            f"Relevant source code matches were located for: *\"{user_question}\"*.\n"
-            "Please check the source citations below to view the exact code implementation lines."
+            "## Offline repository summary\n\n"
+            "> **Notice:** External AI providers are temporarily unavailable. "
+            "This response is based on deterministic retrieval from the indexed repository.\n\n"
+            f"The indexed context contains relevant matches for **{user_question}**. "
+            "Review the source citations below for the exact files and line ranges.\n\n"
+            "**Key takeaway:** The citations are the authoritative evidence available while offline."
         )
         
         return LLMResponse(
