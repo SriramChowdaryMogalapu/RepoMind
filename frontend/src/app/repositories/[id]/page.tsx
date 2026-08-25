@@ -62,11 +62,29 @@ export default function RepositoryDetailPage() {
 
   const handleTriggerIndex = async () => {
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/repositories/${id}/index`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/repositories/${id}/index`, {
         method: 'POST',
       });
-      loadRepoDetails();
-      loadRepoFiles();
+      if (!res.ok) return;
+
+      const initialStatus = await res.json();
+      setRepo((currentRepo: any) => ({ ...currentRepo, ...initialStatus }));
+
+      let status = initialStatus.status;
+      while (status !== 'READY' && status !== 'FAILED') {
+        await new Promise((resolve) => setTimeout(resolve, 7000)); // Poll every 7 seconds
+        const statusRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/repositories/${id}/status`);
+        if (!statusRes.ok) return;
+
+        const statusData = await statusRes.json();
+        status = statusData.status;
+        setRepo((currentRepo: any) => ({ ...currentRepo, ...statusData }));
+      }
+
+      if (status === 'READY') {
+        await loadRepoDetails();
+        await loadRepoFiles();
+      }
     } catch {}
   };
 
