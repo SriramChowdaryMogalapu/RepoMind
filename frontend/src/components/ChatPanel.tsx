@@ -1,9 +1,12 @@
 // frontend/src/components/ChatPanel.tsx
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, FileText, X, Sparkles, ExternalLink, Bot, User, Check, Tag } from 'lucide-react';
-import { ChatSkeletonLoader } from './ui/LoadingStates';
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  Send, Sparkles, ExternalLink, Bot, User, Tag, X, FileCode, 
+  Layers, Play
+} from 'lucide-react';
+import { ChatSkeletonLoader, IndexingLoader } from './ui/LoadingStates';
 
 interface Source {
   file_path: string;
@@ -23,47 +26,109 @@ interface Message {
 
 interface ChatPanelProps {
   repositoryId: string;
+  status: 'PENDING' | 'INDEXING' | 'COMPLETED' | 'FAILED';
   availableFiles: string[];
+  taggedFiles: string[];
+  onAddTag: (path: string) => void;
+  onRemoveTag: (path: string) => void;
+  onOpenFileModal: (path: string, githubUrl?: string) => void;
+  onTriggerIndex: () => void;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ repositoryId, availableFiles }) => {
+export const ChatPanel: React.FC<ChatPanelProps> = ({
+  repositoryId,
+  status,
+  availableFiles,
+  taggedFiles,
+  onAddTag,
+  onRemoveTag,
+  onOpenFileModal,
+  onTriggerIndex,
+}) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const [taggedFiles, setTaggedFiles] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  
-  // Autocomplete dropdown state
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  // Autocomplete state
   const [showDropdown, setShowDropdown] = useState(false);
-  const [filterText, setFilterText] = useState('');
+  const [filterQuery, setFilterQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Filtered files for autocomplete
+  const filteredFiles = availableFiles.filter((f) =>
+    f.toLowerCase().includes(filterQuery.toLowerCase())
+  );
+
+  const updateMentionState = (value: string, cursorPosition: number) => {
+    const textBeforeCursor = value.slice(0, cursorPosition);
+    const mentionMatch = textBeforeCursor.match(/(?:^|\s)@([^\s]*)$/);
+
+    if (mentionMatch) {
+      setFilterQuery(mentionMatch[1]);
+      setSelectedIndex(0);
+      setShowDropdown(true);
+      return;
+    }
+
+    setShowDropdown(false);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setInput(val);
-
-    const lastWord = val.split(' ').pop() || '';
-    if (lastWord.startsWith('@')) {
-      setShowDropdown(true);
-      setFilterText(lastWord.slice(1).toLowerCase());
-    } else {
-      setShowDropdown(false);
-    }
+    updateMentionState(val, e.target.selectionStart ?? val.length);
   };
 
-  const handleSelectFile = (file: string) => {
-    if (!taggedFiles.includes(file)) {
-      setTaggedFiles([...taggedFiles, file]);
+  const handleSelectFile = (filePath: string) => {
+    onAddTag(filePath);
+
+    if (inputRef.current) {
+      const cursorPos = inputRef.current.selectionStart ?? input.length;
+      const textBeforeCursor = input.slice(0, cursorPos);
+      const textAfterCursor = input.slice(cursorPos);
+      const mentionMatch = textBeforeCursor.match(/(?:^|\s)@([^\s]*)$/);
+
+      if (mentionMatch && mentionMatch.index !== undefined) {
+        const mentionStart = mentionMatch.index + (textBeforeCursor[mentionMatch.index] === ' ' ? 1 : 0);
+        const updated = textBeforeCursor.slice(0, mentionStart) + textAfterCursor;
+        setInput(updated ? `${updated.trimEnd()} ` : '');
+      }
     }
-    // Remove the trailing @searchword
-    const words = input.split(' ');
-    words.pop();
-    setInput(words.join(' ') + (words.length > 0 ? ' ' : ''));
+
     setShowDropdown(false);
     inputRef.current?.focus();
   };
 
-  const removeTaggedFile = (file: string) => {
-    setTaggedFiles(taggedFiles.filter((f) => f !== file));
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showDropdown || filteredFiles.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev + 1) % Math.min(filteredFiles.length, 6));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev - 1 + Math.min(filteredFiles.length, 6)) % Math.min(filteredFiles.length, 6));
+    } else if (e.key === 'Enter' && showDropdown) {
+      e.preventDefault();
+      handleSelectFile(filteredFiles[selectedIndex]);
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const droppedPath = e.dataTransfer.getData('text/plain');
+    if (droppedPath && availableFiles.includes(droppedPath)) {
+      onAddTag(droppedPath);
+    }
+  };
+
+  const openTaggedFile = (file: string) => {
+    onOpenFileModal(file);
   };
 
   const handleSend = async (e: React.FormEvent) => {
@@ -95,20 +160,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ repositoryId, availableFil
       );
 
       const data = await res.json();
-      const botMessage: Message = {
-        role: 'assistant',
-        content: data.answer || 'No response returned.',
-        sources: data.sources || [],
-        model: data.model_name,
-      };
-
-      setMessages((prev) => [...prev, botMessage]);
-    } catch (err) {
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: 'An error occurred while communicating with the backend.',
+          content: data.answer || 'No answer returned.',
+          sources: data.sources || [],
+          model: data.model_name,
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Error connecting to the AI backend.',
         },
       ]);
     } finally {
@@ -116,46 +182,85 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ repositoryId, availableFil
     }
   };
 
-  const filteredFileList = availableFiles.filter((f) =>
-    f.toLowerCase().includes(filterText)
-  );
-
   return (
-    <div className="flex flex-col h-[650px] rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
-      {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div 
+      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={handleDrop}
+      className={`relative flex flex-col h-full bg-zinc-900/40 overflow-hidden transition ${
+        isDragOver ? 'ring-2 ring-blue-500 bg-blue-950/20' : ''
+      }`}
+    >
+      {/* Indexing Banner */}
+      {status === 'PENDING' && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-950/90 p-6 text-center backdrop-blur-md">
+          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-blue-400/30 bg-blue-500/10 text-blue-300 shadow-lg shadow-blue-950/40">
+            <Layers className="h-8 w-8" />
+          </div>
+          <h3 className="text-lg font-bold text-white">Ready to index repository</h3>
+          <p className="mt-2 max-w-md text-sm leading-relaxed text-zinc-400">
+            Give RepoMind permission to index this repository for file-grounded Q&amp;A.
+          </p>
+          <button
+            onClick={onTriggerIndex}
+            className="mt-6 flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-zinc-950"
+          >
+            <Play className="h-4 w-4 fill-white" />
+            <span>Allow and index repository</span>
+          </button>
+        </div>
+      )}
+
+      {status === 'INDEXING' && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-zinc-950/90 p-6 text-center backdrop-blur-md">
+          <IndexingLoader />
+        </div>
+      )}
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-6">
         {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500">
-            <Bot className="w-10 h-10 mb-2 text-zinc-600" />
-            <p className="text-sm font-medium text-zinc-400">Ask any question about this codebase</p>
-            <p className="text-xs text-zinc-500 mt-1 max-w-sm">
-              Type <code className="text-blue-400 bg-zinc-800 px-1 py-0.5 rounded">@</code> to pin specific files into the context window.
+          <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500 py-12">
+            <div className="w-12 h-12 rounded-2xl bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center mb-3">
+              <Sparkles className="w-6 h-6 text-blue-400" />
+            </div>
+            <h4 className="text-sm font-semibold text-zinc-200">RepoMind Intelligence Chat</h4>
+            <p className="text-xs text-zinc-400 mt-1 max-w-sm">
+              Type <code className="text-blue-400 bg-zinc-800 px-1 py-0.5 rounded">@</code> to auto-complete and pin files directly to context.
             </p>
           </div>
         )}
 
         {messages.map((m, idx) => (
-          <div key={idx} className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div key={idx} className={`flex gap-3.5 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {m.role === 'assistant' && (
-              <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center shrink-0">
                 <Bot className="w-4 h-4 text-blue-400" />
               </div>
             )}
 
-            <div className={`space-y-2 max-w-[85%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-              {/* Tagged files badge */}
+            <div className={`space-y-2 max-w-[80%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+              <div className="flex items-center gap-2 text-[11px] text-zinc-500 px-1">
+                <span className="font-medium text-zinc-300">{m.role === 'user' ? 'You' : 'RepoMind AI'}</span>
+                {m.model && <span className="text-[10px] text-zinc-500 font-mono">({m.model})</span>}
+              </div>
+
               {m.tagged_files && m.tagged_files.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-1">
+                <div className="flex flex-wrap gap-1.5">
                   {m.tagged_files.map((file, fIdx) => (
-                    <span key={fIdx} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">
-                      <Tag className="w-2.5 h-2.5" />
-                      {file}
-                    </span>
+                    <button
+                      key={fIdx}
+                      onClick={() => openTaggedFile(file)}
+                      className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition font-mono"
+                    >
+                      <Tag className="w-3 h-3" />
+                      <span>{file}</span>
+                    </button>
                   ))}
                 </div>
               )}
 
-              <div className={`p-3.5 rounded-xl text-sm leading-relaxed ${
+              <div className={`p-4 rounded-2xl text-sm leading-relaxed ${
                 m.role === 'user'
                   ? 'bg-blue-600 text-white rounded-tr-none'
                   : 'bg-zinc-800/80 border border-zinc-700/60 text-zinc-200 rounded-tl-none'
@@ -163,29 +268,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ repositoryId, availableFil
                 <p className="whitespace-pre-wrap">{m.content}</p>
               </div>
 
-              {/* Source citations */}
               {m.sources && m.sources.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 pt-1">
+                <div className="flex flex-wrap gap-2 pt-1">
                   {m.sources.map((src, sIdx) => (
-                    <a
+                    <button
                       key={sIdx}
-                      href={src.github_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-zinc-950/80 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200 text-xs transition"
+                      onClick={() => onOpenFileModal(src.file_path, src.github_url)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200 text-xs transition font-mono"
                     >
-                      <FileText className="w-3 h-3 text-blue-400" />
+                      <FileCode className="w-3.5 h-3.5 text-blue-400" />
                       <span>{src.file_path}:{src.start_line}-{src.end_line}</span>
-                      <ExternalLink className="w-2.5 h-2.5 text-zinc-500" />
-                    </a>
+                      <ExternalLink className="w-3 h-3 text-zinc-600" />
+                    </button>
                   ))}
                 </div>
               )}
             </div>
 
             {m.role === 'user' && (
-              <div className="w-7 h-7 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                <User className="w-4 h-4 text-zinc-400" />
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 border border-blue-400/40 flex items-center justify-center shrink-0">
+                <User className="w-4 h-4 text-white" />
               </div>
             )}
           </div>
@@ -194,44 +296,70 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ repositoryId, availableFil
         {isLoading && <ChatSkeletonLoader />}
       </div>
 
-      {/* Input Bar & File Tags */}
-      <div className="p-3 border-t border-zinc-800 bg-zinc-950/60 relative">
-        {/* File Autocomplete Suggestions */}
-        {showDropdown && filteredFileList.length > 0 && (
-          <div className="absolute bottom-full left-3 right-3 mb-2 max-h-48 overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl z-50">
-            <div className="p-1.5 text-[10px] text-zinc-500 uppercase font-semibold border-b border-zinc-800">
-              Pin File into Prompt Context
+      {/* Input Form */}
+      <div className="p-4 border-t border-zinc-800 bg-zinc-950/80 relative">
+        {/* Modern @ Autocomplete Dropdown */}
+        {showDropdown && filteredFiles.length > 0 && (
+          <div className="absolute bottom-full left-4 right-4 mb-2 max-h-56 overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl z-50">
+            <div className="px-3 py-2 text-[10px] text-zinc-400 font-semibold uppercase border-b border-zinc-800 flex justify-between">
+              <span>Matching Files</span>
+              <span>Use ↑ ↓ to navigate, Enter to pin</span>
             </div>
-            {filteredFileList.slice(0, 8).map((file, i) => (
+            {filteredFiles.slice(0, 6).map((file, i) => (
               <button
                 key={i}
                 type="button"
                 onClick={() => handleSelectFile(file)}
-                className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-blue-600 hover:text-white flex items-center gap-2 transition"
+                className={`w-full text-left px-3 py-2.5 text-xs flex items-center justify-between transition ${
+                  selectedIndex === i
+                    ? 'bg-blue-600 text-white'
+                    : 'text-zinc-300 hover:bg-zinc-800/80'
+                }`}
               >
-                <FileText className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{file}</span>
+                <div className="flex items-center gap-2 truncate">
+                  <FileCode className="w-3.5 h-3.5 shrink-0" />
+                  <span className="font-mono truncate">{file}</span>
+                </div>
+                <span className="text-[10px] opacity-70">Pin</span>
               </button>
             ))}
           </div>
         )}
 
-        {/* Selected File Chips */}
+        {/* Tagged Pills */}
         {taggedFiles.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-2 px-1">
+          <div className="mb-3 rounded-xl border border-blue-500/20 bg-blue-500/[0.06] p-2.5">
+            <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-blue-300">
+              <Tag className="h-3.5 w-3.5" />
+              <span>Files in context</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
             {taggedFiles.map((file, idx) => (
-              <span key={idx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-800 border border-zinc-700 text-xs text-zinc-200">
-                <Tag className="w-3 h-3 text-blue-400" />
-                <span className="truncate max-w-[180px]">{file}</span>
+              <div 
+                key={idx} 
+                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-blue-400/30 bg-blue-500/15 px-2.5 py-1.5 text-xs text-blue-200 shadow-sm shadow-blue-950/30"
+              >
+                <FileCode className="h-3.5 w-3.5 shrink-0 text-blue-300" />
                 <button
                   type="button"
-                  onClick={() => removeTaggedFile(file)}
+                  onClick={() => openTaggedFile(file)}
+                  title={`Open ${file}`}
+                  className="truncate font-mono hover:text-white hover:underline"
+                >
+                  {file}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRemoveTag(file)}
+                  aria-label={`Remove ${file} from context`}
+                  title="Remove from context"
                   className="hover:text-red-400 transition"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
-              </span>
+              </div>
             ))}
+            </div>
           </div>
         )}
 
@@ -241,13 +369,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ repositoryId, availableFil
             type="text"
             value={input}
             onChange={handleInputChange}
-            placeholder="Ask a question or type @ to pin a file..."
-            className="flex-1 px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg text-sm text-white placeholder-zinc-500 outline-none transition"
+            onClick={(e) => updateMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length)}
+            onKeyUp={(e) => updateMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length)}
+            onKeyDown={handleKeyDown}
+            disabled={status !== 'COMPLETED'}
+            placeholder={
+              status === 'COMPLETED'
+                ? 'Ask a question, or type @ to pin files into context...'
+                : 'Repository must be indexed before chatting.'
+            }
+            className="flex-1 px-4 py-3 bg-zinc-900/90 border border-zinc-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl text-sm text-white placeholder-zinc-500 outline-none transition disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={!input.trim() || isLoading}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center gap-1.5 transition"
+            disabled={!input.trim() || isLoading || status !== 'COMPLETED'}
+            className="px-5 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl text-sm font-medium flex items-center gap-2 transition shadow-lg shadow-blue-600/20"
           >
             <Send className="w-4 h-4" />
           </button>
