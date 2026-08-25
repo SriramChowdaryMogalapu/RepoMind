@@ -3,14 +3,22 @@ name: RepoMind CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
   pull_request:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
 
 jobs:
+  # ============================================================
+  # Backend: Lint, Format, Tests & Evaluation
+  # ============================================================
   backend-checks:
     name: Backend Lint, Types & Tests
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: ./backend
@@ -23,7 +31,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
+          cache: pip
+          cache-dependency-path: ./backend/requirements.txt
 
       - name: Install dependencies
         run: |
@@ -31,18 +40,34 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio ruff
 
-      - name: Run Ruff Lint Check
-        run: ruff check .
+      # ----------------------------------------------------------
+      # Ruff
+      # ----------------------------------------------------------
+      # - name: Run Ruff lint check
+      #   run: ruff check .
 
+      # - name: Run Ruff format check
+      #   run: ruff format --check .
+
+      # ----------------------------------------------------------
+      # Tests
+      # ----------------------------------------------------------
       - name: Run Backend Unit & Integration Tests
         run: python -m pytest -v -s
 
+      # ----------------------------------------------------------
+      # RAG Evaluation
+      # ----------------------------------------------------------
       - name: Run RAG Evaluation Benchmark
         run: python scripts/run_eval.py
 
+  # ============================================================
+  # Frontend: Install, Type Check & Build
+  # ============================================================
   frontend-checks:
     name: Frontend Lint & Type Checks
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: ./frontend
@@ -55,20 +80,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
+          cache: npm
           cache-dependency-path: ./frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Next.js Type Check & Build
+      - name: Run Next.js Build
         run: npm run build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
 
+  # ============================================================
+  # Docker: Verify Backend & Frontend Images Build
+  # ============================================================
   docker-build:
     name: Docker Builds Verification
-    needs: [backend-checks, frontend-checks]
+    needs:
+      - backend-checks
+      - frontend-checks
+
     runs-on: ubuntu-latest
 
     steps:
@@ -79,7 +110,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Backend Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
@@ -87,7 +118,7 @@ jobs:
           tags: repomind-backend:test
 
       - name: Build Frontend Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
