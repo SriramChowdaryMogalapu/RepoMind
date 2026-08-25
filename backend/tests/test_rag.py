@@ -4,8 +4,10 @@ import uuid
 import pytest
 
 from app.llm.context_builder import build_rag_messages
+from app.llm.fallback_provider import MultiProviderFallbackLLM
 from app.llm.factory import get_llm_provider
 from app.llm.mock_provider import MockLLMProvider
+from app.core.config import settings
 from app.retrieval.base import RetrievedChunk
 
 
@@ -36,7 +38,9 @@ async def test_rag_context_building_and_mock_generation():
 
     assert len(messages) == 2
     assert messages[0].role == "system"
-    assert "UNTRUSTED DATA" in messages[0].content
+    assert "unprivileged data" in messages[0].content
+    assert "RESPONSE FORMAT" in messages[0].content
+    assert "Do not repeat the entire retrieved context" in messages[0].content
     assert "src/auth/jwt.py" in messages[1].content
     print("[TEST] Context assembled with system delimiters and file paths.")
 
@@ -63,8 +67,27 @@ async def test_insufficient_evidence_response():
     print("[TEST] Correctly handled zero-evidence query without hallucinations.")
 
 
-def test_llm_factory_resolution():
+def test_llm_factory_resolution(monkeypatch):
     print("\n[TEST] Testing get_llm_provider() factory resolution...")
+    monkeypatch.setattr(settings, "LLM_PROVIDER", "mock")
+    monkeypatch.setattr(settings, "LLM_API_KEY", None)
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", None)
     provider = get_llm_provider()
-    assert isinstance(provider, MockLLMProvider)
+    assert isinstance(provider, MultiProviderFallbackLLM)
+    assert any(isinstance(candidate, MockLLMProvider) for candidate in provider.providers)
     print(f"[TEST] Successfully resolved default LLM provider: {type(provider).__name__}")
+
+
+@pytest.mark.asyncio
+async def test_offline_fallback_extracts_question_without_echoing_context():
+    print("\n[TEST] Verifying offline fallback response formatting...")
+    provider = MultiProviderFallbackLLM(providers=[])
+    messages, _ = build_rag_messages("Tell me about this file", [])
+
+    response = await provider.generate_response(messages)
+
+    assert "Tell me about this file" in response.content
+    assert "<RETRIEVED_REPOSITORY_CONTEXT>" not in response.content
+    assert "USER QUESTION:" not in response.content
+    assert "Offline repository summary" in response.content
+    print("[TEST] Offline fallback extracted the question without leaking prompt scaffolding.")

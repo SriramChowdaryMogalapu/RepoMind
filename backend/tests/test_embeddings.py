@@ -2,7 +2,9 @@
 import pytest
 
 from app.embeddings.factory import get_embedding_provider
+from app.embeddings.fallback_provider import MultiProviderFallbackEmbedding
 from app.embeddings.mock_provider import MockEmbeddingProvider
+from app.core.config import settings
 
 
 @pytest.mark.asyncio
@@ -45,8 +47,12 @@ async def test_mock_batch_embeddings():
     print("[TEST] Vector divergence for different inputs verified.")
 
 
-def test_embedding_factory_default():
+def test_embedding_factory_default(monkeypatch):
     print("\n[TEST] Testing get_embedding_provider() factory resolution...")
+    monkeypatch.setattr(settings, "EMBEDDING_PROVIDER", "mock")
+    monkeypatch.setattr(settings, "LLM_API_KEY", None)
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", None)
     provider = get_embedding_provider()
-    assert isinstance(provider, MockEmbeddingProvider)
+    assert isinstance(provider, MultiProviderFallbackEmbedding)
+    assert any(isinstance(candidate, MockEmbeddingProvider) for candidate in provider.providers)
     print(f"[TEST] Factory resolved to default provider: {type(provider).__name__}")
