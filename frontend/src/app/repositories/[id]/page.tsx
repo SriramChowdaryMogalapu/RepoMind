@@ -44,7 +44,18 @@ export default function RepositoryDetailPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/repositories/${id}/files`);
       if (res.ok) {
         const data = await res.json();
-        setFiles(data.files || []);
+        const paths = Array.isArray(data.files)
+          ? data.files
+              .map((file: unknown) => {
+                if (typeof file === 'string') return file;
+                if (file && typeof file === 'object' && 'path' in file && typeof file.path === 'string') {
+                  return file.path;
+                }
+                return null;
+              })
+              .filter((path: string | null): path is string => Boolean(path))
+          : [];
+        setFiles(paths);
       }
     } catch {}
   };
