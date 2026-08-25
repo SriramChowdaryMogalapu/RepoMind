@@ -19,6 +19,14 @@ class AppException(Exception):
         self.details = details
         super().__init__(message)
 
+class NotFoundException(AppException):
+    def __init__(self, message: str = "Resource not found"):
+        super().__init__(
+            message=message,
+            code="NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND
+        )
+
 
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
     return JSONResponse(
