@@ -9,6 +9,15 @@ from app.llm.factory import get_llm_provider
 from app.llm.context_builder import build_rag_messages
 from app.schemas.chat import ChatRequest, ChatResponse, SourceCitation
 from app.core.errors import AppException
+import logging
+import time
+from app.core.logging import setup_logging
+
+try:
+    setup_logging()
+    logger = logging.getLogger("repomind.api")
+except e as Exception:
+    print(f"Logger Setup Failed: {e}")
 
 
 class ChatService:
