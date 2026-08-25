@@ -1,8 +1,9 @@
 # backend/app/schemas/chunk.py
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
-from uuid import UUID
 from datetime import datetime
+from typing import Any
+from uuid import UUID
+
+from pydantic import BaseModel
 
 
 class CodeChunkBase(BaseModel):
@@ -11,14 +12,14 @@ class CodeChunkBase(BaseModel):
     content: str
     start_line: int
     end_line: int
-    symbol_name: Optional[str] = None
-    symbol_type: Optional[str] = None
-    parent_symbol: Optional[str] = None
-    chunk_metadata: Optional[Dict[str, Any]] = None
+    symbol_name: str | None = None
+    symbol_type: str | None = None
+    parent_symbol: str | None = None
+    chunk_metadata: dict[str, Any] | None = None
 
 
 class CodeChunkCreate(CodeChunkBase):
-    embedding: Optional[List[float]] = None
+    embedding: list[float] | None = None
 
 
 class CodeChunkResponse(CodeChunkBase):
@@ -32,4 +33,4 @@ class CodeChunkResponse(CodeChunkBase):
 class CodeChunkListResponse(BaseModel):
     repository_id: UUID
     total: int
-    chunks: List[CodeChunkResponse]
+    chunks: list[CodeChunkResponse]

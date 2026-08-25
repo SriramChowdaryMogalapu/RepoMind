@@ -1,10 +1,10 @@
 # backend/app/llm/gemini_provider.py
-from typing import List
+
 import httpx
 from fastapi import status
 
-from app.llm.base import BaseLLMProvider, LLMMessage, LLMResponse
 from app.core.errors import AppException
+from app.llm.base import BaseLLMProvider, LLMMessage, LLMResponse
 
 
 class GeminiLLMProvider(BaseLLMProvider):
@@ -12,17 +12,14 @@ class GeminiLLMProvider(BaseLLMProvider):
         self,
         api_key: str,
         model_name: str = "gemini-1.5-flash",
-        base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+        base_url: str = "https://generativelanguage.googleapis.com/v1beta",
     ):
         self.api_key = api_key
         self.model_name = model_name.replace("models/", "")
         self.base_url = base_url.rstrip("/")
 
     async def generate_response(
-        self,
-        messages: List[LLMMessage],
-        temperature: float = 0.1,
-        max_tokens: int = 1500
+        self, messages: list[LLMMessage], temperature: float = 0.1, max_tokens: int = 1500
     ) -> LLMResponse:
         system_instruction = None
         contents = []
@@ -32,17 +29,11 @@ class GeminiLLMProvider(BaseLLMProvider):
                 system_instruction = {"parts": [{"text": m.content}]}
             else:
                 role = "user" if m.role == "user" else "model"
-                contents.append({
-                    "role": role,
-                    "parts": [{"text": m.content}]
-                })
+                contents.append({"role": role, "parts": [{"text": m.content}]})
 
         payload = {
             "contents": contents,
-            "generationConfig": {
-                "temperature": temperature,
-                "maxOutputTokens": max_tokens
-            }
+            "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens},
         }
         if system_instruction:
             payload["systemInstruction"] = system_instruction
@@ -55,7 +46,7 @@ class GeminiLLMProvider(BaseLLMProvider):
                 raise AppException(
                     code="GEMINI_LLM_ERROR",
                     message=f"Gemini API returned error: {resp.text}",
-                    status_code=status.HTTP_502_BAD_GATEWAY
+                    status_code=status.HTTP_502_BAD_GATEWAY,
                 )
             data = resp.json()
             candidates = data.get("candidates", [])
@@ -65,8 +56,4 @@ class GeminiLLMProvider(BaseLLMProvider):
                 content = candidates[0]["content"]["parts"][0]["text"]
 
             usage = data.get("usageMetadata", {})
-            return LLMResponse(
-                content=content,
-                model_name=self.model_name,
-                usage=usage
-            )
+            return LLMResponse(content=content, model_name=self.model_name, usage=usage)

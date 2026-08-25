@@ -1,6 +1,6 @@
 # backend/tests/test_retrieval.py
-import pytest
 import uuid
+
 from app.retrieval.base import RetrievedChunk
 
 
@@ -24,12 +24,12 @@ def test_retrieved_chunk_model():
         parent_symbol=None,
         score=0.94,
         retrieval_method="hybrid",
-        metadata={"docstring": "Validates JSON Web Tokens."}
+        metadata={"docstring": "Validates JSON Web Tokens."},
     )
 
     print(f"[TEST] Chunk created: {chunk.file_path} (Lines {chunk.start_line}-{chunk.end_line})")
     print(f"[TEST] Symbol: {chunk.symbol_name} ({chunk.symbol_type}) with score: {chunk.score}")
-    
+
     assert chunk.file_path == "src/auth/token.py"
     assert chunk.symbol_name == "verify_jwt"
     assert chunk.score == 0.94

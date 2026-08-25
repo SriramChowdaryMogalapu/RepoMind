@@ -1,9 +1,10 @@
 # backend/app/embeddings/gemini_provider.py
-from typing import List
+
 import httpx
-from app.embeddings.base import EmbeddingProvider
-from app.core.errors import AppException
 from fastapi import status
+
+from app.core.errors import AppException
+from app.embeddings.base import EmbeddingProvider
 
 
 class GeminiEmbeddingProvider(EmbeddingProvider):
@@ -11,7 +12,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         self,
         api_key: str,
         model_name: str = "gemini-embedding-001",
-        base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+        base_url: str = "https://generativelanguage.googleapis.com/v1beta",
     ):
         self.api_key = api_key
         self.model_name = model_name.replace("models/", "")
@@ -22,21 +23,21 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
     def dimension(self) -> int:
         return self._dim
 
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         results = await self.embed_batch([text])
         return results[0]
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         if not texts:
             return []
 
         url = f"{self.base_url}/models/{self.model_name}:batchEmbedContents?key={self.api_key}"
-        
+
         requests_payload = [
             {
                 "model": f"models/{self.model_name}",
                 "content": {"parts": [{"text": t if t.strip() else " "}]},
-                "outputDimensionality": 1536
+                "outputDimensionality": 1536,
             }
             for t in texts
         ]
@@ -47,7 +48,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
                 raise AppException(
                     code="GEMINI_EMBEDDING_ERROR",
                     message=f"Gemini embedding API error: {resp.text}",
-                    status_code=status.HTTP_502_BAD_GATEWAY
+                    status_code=status.HTTP_502_BAD_GATEWAY,
                 )
             data = resp.json()
             embeddings = [item["values"] for item in data.get("embeddings", [])]

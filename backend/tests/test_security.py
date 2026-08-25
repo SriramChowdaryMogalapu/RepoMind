@@ -1,8 +1,6 @@
 # backend/tests/test_security.py
-import pytest
-import time
-from app.core.security import redact_secrets, is_safe_external_url, validate_and_parse_github_url
 from app.core.rate_limiter import InMemoryRateLimiter
+from app.core.security import is_safe_external_url, redact_secrets
 
 
 def test_secret_redaction():
@@ -30,7 +28,7 @@ def test_ssrf_url_guard():
     safe_urls = [
         "https://github.com/octocat/Hello-World",
         "https://raw.githubusercontent.com/octocat/Hello-World/main/README.md",
-        "https://api.github.com/repos/octocat/Hello-World"
+        "https://api.github.com/repos/octocat/Hello-World",
     ]
     for url in safe_urls:
         allowed = is_safe_external_url(url)
@@ -39,10 +37,10 @@ def test_ssrf_url_guard():
 
     unsafe_urls = [
         "http://169.254.169.254/latest/meta-data/",  # AWS metadata endpoint
-        "http://127.0.0.1:5432",                     # Local database
+        "http://127.0.0.1:5432",  # Local database
         "http://localhost:8000",
         "https://attacker.com/malicious",
-        "file:///etc/passwd"
+        "file:///etc/passwd",
     ]
     for url in unsafe_urls:
         allowed = is_safe_external_url(url)

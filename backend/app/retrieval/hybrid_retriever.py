@@ -1,15 +1,15 @@
 # backend/app/retrieval/hybrid_retriever.py
 import re
-from typing import List, Optional, Dict
 from uuid import UUID
+
+from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import or_
 
+from app.embeddings.factory import get_embedding_provider
 from app.models.chunk import CodeChunk
 from app.models.file import File
 from app.retrieval.base import BaseRetriever, RetrievedChunk
-from app.embeddings.factory import get_embedding_provider
 
 
 class HybridRetriever(BaseRetriever):
@@ -22,7 +22,9 @@ class HybridRetriever(BaseRetriever):
         self.db = db
         self.embedding_provider = get_embedding_provider()
 
-    async def get_tagged_file_chunks(self, repository_id: UUID, file_paths: List[str]) -> List[RetrievedChunk]:
+    async def get_tagged_file_chunks(
+        self, repository_id: UUID, file_paths: list[str]
+    ) -> list[RetrievedChunk]:
         """Fetches chunks from specifically tagged files with highest priority score."""
         if not file_paths:
             return []
@@ -34,10 +36,7 @@ class HybridRetriever(BaseRetriever):
         stmt = (
             select(CodeChunk, File.path, File.language)
             .join(File, CodeChunk.file_id == File.id)
-            .where(
-                CodeChunk.repository_id == repository_id,
-                File.path.in_(clean_paths)
-            )
+            .where(CodeChunk.repository_id == repository_id, File.path.in_(clean_paths))
             .order_by(CodeChunk.start_line.asc())
         )
         result = await self.db.execute(stmt)
@@ -56,14 +55,14 @@ class HybridRetriever(BaseRetriever):
                 symbol_name=chunk.symbol_name,
                 symbol_type=chunk.symbol_type,
                 score=1.0,  # Max score guarantees top placement
-                retrieval_method="tagged_file"
+                retrieval_method="tagged_file",
             )
             for chunk, file_path, file_language in rows
         ]
 
     async def _vector_search(
-        self, repository_id: UUID, query: str, limit: int, path_filter: Optional[str] = None
-    ) -> List[RetrievedChunk]:
+        self, repository_id: UUID, query: str, limit: int, path_filter: str | None = None
+    ) -> list[RetrievedChunk]:
         query_vector = await self.embedding_provider.embed_text(query)
 
         # Cosine distance order using pgvector <=> operator
@@ -72,7 +71,7 @@ class HybridRetriever(BaseRetriever):
                 CodeChunk,
                 File.path.label("file_path"),
                 File.language.label("file_language"),
-                CodeChunk.embedding.cosine_distance(query_vector).label("distance")
+                CodeChunk.embedding.cosine_distance(query_vector).label("distance"),
             )
             .join(File, CodeChunk.file_id == File.id)
             .where(CodeChunk.repository_id == repository_id)
@@ -104,14 +103,14 @@ class HybridRetriever(BaseRetriever):
                     parent_symbol=chunk.parent_symbol,
                     score=similarity,
                     retrieval_method="vector",
-                    metadata=chunk.chunk_metadata or {}
+                    metadata=chunk.chunk_metadata or {},
                 )
             )
         return candidates
 
     async def _keyword_search(
-        self, repository_id: UUID, query: str, limit: int, path_filter: Optional[str] = None
-    ) -> List[RetrievedChunk]:
+        self, repository_id: UUID, query: str, limit: int, path_filter: str | None = None
+    ) -> list[RetrievedChunk]:
         # Extract potential identifiers and alphanumeric terms
         terms = re.findall(r"[a-zA-Z0-9_\-\.]+", query)
         if not terms:
@@ -123,11 +122,7 @@ class HybridRetriever(BaseRetriever):
             conditions.append(CodeChunk.symbol_name.ilike(f"%{term}%"))
 
         stmt = (
-            select(
-                CodeChunk,
-                File.path.label("file_path"),
-                File.language.label("file_language")
-            )
+            select(CodeChunk, File.path.label("file_path"), File.language.label("file_language"))
             .join(File, CodeChunk.file_id == File.id)
             .where(CodeChunk.repository_id == repository_id)
             .where(or_(*conditions))
@@ -142,15 +137,25 @@ class HybridRetriever(BaseRetriever):
 
         candidates = []
         # Check if query asks for an overview or project summary
-        is_overview_query = any(w in query.lower() for w in ["purpose", "what is", "overview", "explain", "architecture", "about"])
+        is_overview_query = any(
+            w in query.lower()
+            for w in ["purpose", "what is", "overview", "explain", "architecture", "about"]
+        )
         for chunk, file_path, file_language in rows:
             # Score based on exact identifier occurrence count
             exact_matches = sum(1 for t in terms if t.lower() in chunk.content.lower())
-            symbol_bonus = 2 if chunk.symbol_name and any(t.lower() == chunk.symbol_name.lower() for t in terms) else 0
-            
+            symbol_bonus = (
+                2
+                if chunk.symbol_name and any(t.lower() == chunk.symbol_name.lower() for t in terms)
+                else 0
+            )
+
             # Boost documentation files for overview-style questions
             doc_bonus = 0
-            if is_overview_query and any(file_path.lower().endswith(doc) for doc in ["readme.md", "package.json", "pyproject.toml", "cargo.toml"]):
+            if is_overview_query and any(
+                file_path.lower().endswith(doc)
+                for doc in ["readme.md", "package.json", "pyproject.toml", "cargo.toml"]
+            ):
                 doc_bonus = 5
 
             raw_score = exact_matches + symbol_bonus + doc_bonus
@@ -169,7 +174,7 @@ class HybridRetriever(BaseRetriever):
                     parent_symbol=chunk.parent_symbol,
                     score=float(raw_score),
                     retrieval_method="keyword",
-                    metadata=chunk.chunk_metadata or {}
+                    metadata=chunk.chunk_metadata or {},
                 )
             )
 
@@ -177,19 +182,19 @@ class HybridRetriever(BaseRetriever):
         return candidates[:limit]
 
     async def retrieve(
-        self,
-        repository_id: UUID,
-        query: str,
-        top_k: int = 8,
-        path_filter: Optional[str] = None
-    ) -> List[RetrievedChunk]:
-        vector_results = await self._vector_search(repository_id, query, limit=top_k * 2, path_filter=path_filter)
-        keyword_results = await self._keyword_search(repository_id, query, limit=top_k * 2, path_filter=path_filter)
+        self, repository_id: UUID, query: str, top_k: int = 8, path_filter: str | None = None
+    ) -> list[RetrievedChunk]:
+        vector_results = await self._vector_search(
+            repository_id, query, limit=top_k * 2, path_filter=path_filter
+        )
+        keyword_results = await self._keyword_search(
+            repository_id, query, limit=top_k * 2, path_filter=path_filter
+        )
 
         # Reciprocal Rank Fusion (RRF) with constant k=60
         k = 60
-        rrf_scores: Dict[UUID, float] = {}
-        chunk_map: Dict[UUID, RetrievedChunk] = {}
+        rrf_scores: dict[UUID, float] = {}
+        chunk_map: dict[UUID, RetrievedChunk] = {}
 
         for rank, item in enumerate(vector_results):
             chunk_map[item.chunk_id] = item
@@ -202,7 +207,7 @@ class HybridRetriever(BaseRetriever):
 
         sorted_chunks = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
 
-        final_candidates: List[RetrievedChunk] = []
+        final_candidates: list[RetrievedChunk] = []
         for chunk_id, fused_score in sorted_chunks[:top_k]:
             chunk_obj = chunk_map[chunk_id]
             chunk_obj.score = fused_score

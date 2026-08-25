@@ -1,5 +1,6 @@
 # backend/tests/test_repo_validation.py
 import pytest
+
 from app.core.security import validate_and_parse_github_url
 
 
@@ -16,7 +17,9 @@ def test_valid_github_urls():
         assert parsed.owner == exp_owner
         assert parsed.repo == exp_repo
         assert parsed.full_name == exp_full_name
-        print(f"[TEST] -> Parsed owner='{parsed.owner}', repo='{parsed.repo}', full_name='{parsed.full_name}'")
+        print(
+            f"[TEST] -> Parsed owner='{parsed.owner}', repo='{parsed.repo}', full_name='{parsed.full_name}'"
+        )
 
 
 def test_invalid_github_urls():

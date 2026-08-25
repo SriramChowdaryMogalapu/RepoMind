@@ -1,7 +1,7 @@
 # backend/app/embeddings/mock_provider.py
 import hashlib
 import math
-from typing import List
+
 from app.embeddings.base import EmbeddingProvider
 
 
@@ -18,13 +18,13 @@ class MockEmbeddingProvider(EmbeddingProvider):
     def dimension(self) -> int:
         return self._dim
 
-    def _generate_vector(self, text: str) -> List[float]:
+    def _generate_vector(self, text: str) -> list[float]:
         if not text:
             return [0.0] * self._dim
 
         # Generate seed hash
         hash_digest = hashlib.sha256(text.encode("utf-8")).digest()
-        
+
         # Build deterministic pseudo-random float vector
         raw_vec = []
         for i in range(self._dim):
@@ -38,8 +38,8 @@ class MockEmbeddingProvider(EmbeddingProvider):
             return raw_vec
         return [x / norm for x in raw_vec]
 
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         return self._generate_vector(text)
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         return [self._generate_vector(t) for t in texts]

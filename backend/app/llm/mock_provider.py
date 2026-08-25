@@ -1,6 +1,6 @@
 # backend/app/llm/mock_provider.py
 import re
-from typing import List
+
 from app.llm.base import BaseLLMProvider, LLMMessage, LLMResponse
 
 
@@ -14,10 +14,7 @@ class MockLLMProvider(BaseLLMProvider):
         self.model_name = model_name
 
     async def generate_response(
-        self,
-        messages: List[LLMMessage],
-        temperature: float = 0.1,
-        max_tokens: int = 1500
+        self, messages: list[LLMMessage], temperature: float = 0.1, max_tokens: int = 1500
     ) -> LLMResponse:
         user_msg = next((m.content for m in reversed(messages) if m.role == "user"), "")
 
@@ -39,5 +36,5 @@ class MockLLMProvider(BaseLLMProvider):
         return LLMResponse(
             content=content,
             model_name=self.model_name,
-            usage={"prompt_tokens": 120, "completion_tokens": 45, "total_tokens": 165}
+            usage={"prompt_tokens": 120, "completion_tokens": 45, "total_tokens": 165},
         )

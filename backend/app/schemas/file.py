@@ -1,13 +1,13 @@
 # backend/app/schemas/file.py
-from pydantic import BaseModel
 from uuid import UUID
-from typing import List, Optional
+
+from pydantic import BaseModel
 
 
 class FileItemResponse(BaseModel):
     id: UUID
     path: str
-    language: Optional[str]
+    language: str | None
     size_bytes: int
 
     class Config:
@@ -17,4 +17,4 @@ class FileItemResponse(BaseModel):
 class FileListResponse(BaseModel):
     repository_id: UUID
     total: int
-    files: List[FileItemResponse]
+    files: list[FileItemResponse]

@@ -1,7 +1,6 @@
 # backend/app/core/logging.py
 import logging
 import sys
-from typing import Any
 
 # ANSI escape color constants
 GREY = "\x1b[38;20m"

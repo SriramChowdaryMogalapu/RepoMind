@@ -1,8 +1,9 @@
 # backend/app/core/rate_limiter.py
 import time
 from collections import defaultdict
-from typing import Dict, List
-from fastapi import Request, HTTPException, status
+
+from fastapi import HTTPException, Request, status
+
 from app.core.config import settings
 
 
@@ -10,9 +11,10 @@ class InMemoryRateLimiter:
     """
     In-memory sliding window rate limiter per client IP.
     """
+
     def __init__(self, requests_per_minute: int = 60):
         self.rpm = requests_per_minute
-        self.requests: Dict[str, List[float]] = defaultdict(list)
+        self.requests: dict[str, list[float]] = defaultdict(list)
 
     def is_allowed(self, client_ip: str) -> bool:
         now = time.time()
@@ -40,7 +42,7 @@ async def rate_limit_middleware(request: Request, call_next):
     if not rate_limiter.is_allowed(client_ip):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Rate limit exceeded. Please wait before making more requests."
+            detail="Rate limit exceeded. Please wait before making more requests.",
         )
 
     return await call_next(request)

@@ -1,15 +1,15 @@
 # backend/app/parsing/dispatcher.py
-from typing import List
+
 from app.parsing.base import RawChunk
-from app.parsing.python_parser import PythonASTParser
 from app.parsing.fallback_parser import LineBasedParser
 from app.parsing.jupyter_parser import parse_jupyter_notebook
+from app.parsing.python_parser import PythonASTParser
 
 _python_parser = PythonASTParser()
 _fallback_parser = LineBasedParser()
 
 
-def parse_file_to_chunks(content: str, language: str) -> List[RawChunk]:
+def parse_file_to_chunks(content: str, language: str) -> list[RawChunk]:
     if not content:
         return []
 

@@ -21,7 +21,7 @@ def standalone_helper():
 
     symbols = {c.symbol_name: c for c in chunks if c.symbol_name}
     print(f"[TEST] Discovered symbols: {list(symbols.keys())}")
-    
+
     assert "AuthService" in symbols
     assert symbols["AuthService"].symbol_type == "class"
     assert "authenticate_user" in symbols
@@ -34,7 +34,7 @@ def test_fallback_line_chunking_with_overlap():
     print("\n[TEST] Testing fallback line-based chunking with sliding overlap...")
     sample_js = "\n".join([f"const line_{i} = {i};" for i in range(120)])
     chunks = parse_file_to_chunks(sample_js, "JavaScript")
-    
+
     print(f"[TEST] Generated {len(chunks)} overlapping chunks for 120 lines of JS.")
     assert len(chunks) > 1
     assert chunks[0].start_line == 1
