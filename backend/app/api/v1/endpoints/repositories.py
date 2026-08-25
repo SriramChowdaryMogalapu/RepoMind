@@ -1,5 +1,5 @@
 # backend/app/api/v1/endpoints/repositories.py
-from fastapi import APIRouter, Depends, status, BackgroundTasks
+from fastapi import APIRouter, Depends, status, BackgroundTasks, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from uuid import UUID
@@ -169,6 +169,20 @@ async def retrieve_code_chunks(
             ) for c in chunks
         ]
     )
+
+@router.get("/{repository_id}/files/content")
+async def get_file_content(
+    repository_id: UUID,
+    path: str = Query(..., description="Relative file path"),
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(File).where(File.repository_id == repository_id, File.path == path)
+    result = await db.execute(stmt)
+    file_record = result.scalar_one_or_none()
+    if not file_record:
+        raise NotFoundException(message=f"File '{path}' not found in repository.")
+    
+    return {"path": file_record.path, "language": file_record.language, "content": file_record.content}
 
 
 @router.post("/{repo_id}/chat", response_model=ChatResponse)
