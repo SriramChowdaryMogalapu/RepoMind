@@ -5,9 +5,12 @@ from uuid import UUID
 
 
 class ChatRequest(BaseModel):
-    question: str = Field(..., min_length=2, max_length=2000, example="How does authentication work?")
-    top_k: int = Field(default=6, ge=1, le=15)
-    path_filter: Optional[str] = None
+    question: str = Field(..., min_length=2, max_length=2000)
+    top_k: int = Field(default=6, ge=1, le=20)
+    tagged_files: Optional[List[str]] = Field(
+        default=None,
+        description="List of file paths explicitly pinned by the user for context injection (e.g. ['src/main.py'])"
+    )
 
 
 class SourceCitation(BaseModel):
