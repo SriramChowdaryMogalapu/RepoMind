@@ -26,7 +26,7 @@ interface Message {
 
 interface ChatPanelProps {
   repositoryId: string;
-  status: 'PENDING' | 'INDEXING' | 'COMPLETED' | 'FAILED';
+  status: 'PENDING' | 'CLONING' | 'PARSING' | 'EMBEDDING' | 'READY' | 'FAILED';
   availableFiles: string[];
   taggedFiles: string[];
   onAddTag: (path: string) => void;
@@ -211,7 +211,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
       )}
 
-      {status === 'INDEXING' && (
+      {['CLONING', 'PARSING', 'EMBEDDING'].includes(status) && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-zinc-950/90 p-6 text-center backdrop-blur-md">
           <IndexingLoader />
         </div>
@@ -372,17 +372,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             onClick={(e) => updateMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length)}
             onKeyUp={(e) => updateMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length)}
             onKeyDown={handleKeyDown}
-            disabled={status !== 'COMPLETED'}
+            disabled={status !== 'READY'}
             placeholder={
-              status === 'COMPLETED'
+              status === 'READY'
                 ? 'Ask a question, or type @ to pin files into context...'
-                : 'Repository must be indexed before chatting.'
+                : status === 'PENDING'
+                  ? 'Allow indexing to start chatting.'
+                  : 'Repository is being prepared for chatting.'
             }
             className="flex-1 px-4 py-3 bg-zinc-900/90 border border-zinc-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl text-sm text-white placeholder-zinc-500 outline-none transition disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={!input.trim() || isLoading || status !== 'COMPLETED'}
+            disabled={!input.trim() || isLoading || status !== 'READY'}
             className="px-5 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl text-sm font-medium flex items-center gap-2 transition shadow-lg shadow-blue-600/20"
           >
             <Send className="w-4 h-4" />

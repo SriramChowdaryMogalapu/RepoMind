@@ -114,7 +114,7 @@ export default function RepositoryDetailPage() {
 
         <div className="flex items-center gap-2 text-xs">
           <span className={`px-2.5 py-1 rounded-full font-mono text-[11px] border ${
-            repo?.status === 'COMPLETED'
+            repo?.status === 'READY'
               ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
               : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
           }`}>
