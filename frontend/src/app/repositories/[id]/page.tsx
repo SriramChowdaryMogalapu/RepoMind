@@ -16,6 +16,8 @@ export default function RepositoryDetailPage() {
   const [repo, setRepo] = useState<any>(null);
   const [files, setFiles] = useState<string[]>([]);
   const [taggedFiles, setTaggedFiles] = useState<string[]>([]);
+  const [isLoadingRepo, setIsLoadingRepo] = useState(true);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(true);
   
   // Modal state
   const [modalFile, setModalFile] = useState<string | null>(null);
@@ -30,16 +32,22 @@ export default function RepositoryDetailPage() {
   }, [id]);
 
   const loadRepoDetails = async () => {
+    setIsLoadingRepo(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/repositories/${id}`);
       if (res.ok) {
         const data = await res.json();
         setRepo(data);
       }
-    } catch {}
+    } catch {
+      setRepo(null);
+    } finally {
+      setIsLoadingRepo(false);
+    }
   };
 
   const loadRepoFiles = async () => {
+    setIsLoadingFiles(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/repositories/${id}/files`);
       if (res.ok) {
@@ -57,7 +65,11 @@ export default function RepositoryDetailPage() {
           : [];
         setFiles(paths);
       }
-    } catch {}
+    } catch {
+      setFiles([]);
+    } finally {
+      setIsLoadingFiles(false);
+    }
   };
 
   const handleTriggerIndex = async () => {
@@ -104,6 +116,10 @@ export default function RepositoryDetailPage() {
     setTaggedFiles(taggedFiles.filter((f) => f !== path));
   };
 
+  const isRepositoryReady = repo?.status === 'READY';
+  const isLoadingRepositoryContent = isLoadingRepo || (isRepositoryReady && isLoadingFiles);
+  const chatStatus = isLoadingRepositoryContent ? 'EMBEDDING' : (repo?.status || 'PENDING');
+
   return (
     <div className="min-h-screen flex flex-col bg-zinc-950 text-white">
       <Header />
@@ -124,7 +140,7 @@ export default function RepositoryDetailPage() {
               <span>•</span>
               <span className="flex items-center gap-1">
                 <FileText className="w-3 h-3 text-emerald-400" />
-                {files.length} files
+                {repo?.file_count ?? files.length} files
               </span>
             </div>
           </div>
@@ -142,9 +158,9 @@ export default function RepositoryDetailPage() {
       </div>
 
       {/* Main 2-Column Layout */}
-      <div className="flex-1 grid min-h-0 grid-cols-1 grid-rows-[minmax(0,auto)_minmax(0,1fr)] overflow-hidden md:grid-cols-4 md:grid-rows-1 md:h-[calc(100vh-120px)]">
+      <div className="flex-1 grid h-[calc(100vh-120px)] min-h-0 grid-cols-1 grid-rows-[14rem_minmax(0,1fr)] overflow-hidden md:grid-cols-4 md:grid-rows-1">
         {/* Left Column: File Tree */}
-        <div className="min-h-0 max-h-56 overflow-hidden md:col-span-1 md:h-full md:max-h-none">
+        <div className="min-h-0 overflow-hidden md:col-span-1 md:h-full">
           <FileTree
             files={files}
             activeFile={modalFile}
@@ -157,7 +173,7 @@ export default function RepositoryDetailPage() {
         <div className="md:col-span-3 h-full overflow-hidden">
           <ChatPanel
             repositoryId={id}
-            status={repo?.status || 'PENDING'}
+            status={chatStatus}
             availableFiles={files}
             taggedFiles={taggedFiles}
             onAddTag={handleAddTag}
