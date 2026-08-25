@@ -12,6 +12,7 @@ from app.core.errors import AppException
 import logging
 import time
 from app.core.logging import setup_logging
+from app.services.repository_service import RepositoryService
 
 try:
     setup_logging()
@@ -25,6 +26,7 @@ class ChatService:
         self.db = db
         self.retriever = HybridRetriever(db)
         self.llm = get_llm_provider()
+        self.repo_service = RepositoryService(db)
 
     def _build_github_url(self, repo: Repository, file_path: str, start_line: int, end_line: int) -> str:
         branch = repo.default_branch or "main"
