@@ -2,6 +2,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -9,9 +10,12 @@ from app.core.errors import AppException, NotFoundException
 from app.core.security import validate_and_parse_github_url
 from app.db.session import AsyncSessionLocal, get_db
 from app.ingestion.orchestrator import IngestionService
+from app.llm.context_builder import build_documentation_messages
+from app.llm.factory import get_llm_provider
 from app.models.chunk import CodeChunk
 from app.models.file import File
 from app.models.repository import Repository, RepositoryStatus
+from app.retrieval.base import RetrievedChunk
 from app.retrieval.hybrid_retriever import HybridRetriever
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.schemas.file import FileItemResponse, FileListResponse
@@ -223,6 +227,63 @@ async def get_file_content(
         "language": getattr(file_record, "language", "text") or "text",
         "content": file_content,
     }
+
+
+@router.get("/{repository_id}/documentation", response_class=PlainTextResponse)
+async def get_repository_documentation(
+    repository_id: UUID,
+    path: str | None = Query(default=None, description="Optional relative file path"),
+    db: AsyncSession = Depends(get_db),
+):
+    repo_result = await db.execute(select(Repository).where(Repository.id == repository_id))
+    repo = repo_result.scalar_one_or_none()
+    if not repo:
+        raise NotFoundException(message="Repository not found.")
+
+    file_query = select(File).where(File.repository_id == repository_id)
+    if path:
+        file_query = file_query.where(File.path == path.strip().lstrip("/"))
+    file_result = await db.execute(file_query.order_by(File.path.asc()))
+    files = file_result.scalars().all()
+    if path and not files:
+        raise NotFoundException(message=f"File '{path}' not found in repository.")
+
+    documentation_chunks: list[RetrievedChunk] = []
+    for file_record in files:
+        chunk_result = await db.execute(
+            select(CodeChunk)
+            .where(CodeChunk.file_id == file_record.id)
+            .order_by(CodeChunk.start_line.asc())
+        )
+        chunks = chunk_result.scalars().all()
+        documentation_chunks.extend(
+            RetrievedChunk(
+                chunk_id=chunk.id,
+                repository_id=repository_id,
+                file_id=file_record.id,
+                file_path=file_record.path,
+                language=file_record.language,
+                content=chunk.content,
+                start_line=chunk.start_line,
+                end_line=chunk.end_line,
+                symbol_name=chunk.symbol_name,
+                symbol_type=chunk.symbol_type,
+                parent_symbol=chunk.parent_symbol,
+                score=1.0,
+                retrieval_method="documentation",
+            )
+            for chunk in chunks
+        )
+
+    messages, _ = build_documentation_messages(documentation_chunks)
+    llm_response = await get_llm_provider().generate_response(messages, max_tokens=5000)
+    filename = f"{files[0].path.split('/')[-1]}.md" if path else "repomind-documentation.md"
+
+    return PlainTextResponse(
+        content=llm_response.content,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/{repo_id}/chat", response_model=ChatResponse)

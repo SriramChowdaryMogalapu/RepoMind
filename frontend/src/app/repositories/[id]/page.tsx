@@ -142,9 +142,9 @@ export default function RepositoryDetailPage() {
       </div>
 
       {/* Main 2-Column Layout */}
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-4 h-[calc(100vh-120px)] overflow-hidden">
+      <div className="flex-1 grid min-h-0 grid-cols-1 grid-rows-[minmax(0,auto)_minmax(0,1fr)] overflow-hidden md:grid-cols-4 md:grid-rows-1 md:h-[calc(100vh-120px)]">
         {/* Left Column: File Tree */}
-        <div className="md:col-span-1 h-full overflow-hidden">
+        <div className="min-h-0 max-h-56 overflow-hidden md:col-span-1 md:h-full md:max-h-none">
           <FileTree
             files={files}
             activeFile={modalFile}

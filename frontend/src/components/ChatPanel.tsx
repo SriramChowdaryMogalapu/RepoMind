@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { 
   Send, Sparkles, ExternalLink, Bot, User, Tag, X, FileCode, 
-  Layers, Play
+  Layers, Play, Trash2
 } from 'lucide-react';
 import { ChatSkeletonLoader, IndexingLoader } from './ui/LoadingStates';
 
@@ -48,6 +48,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onTriggerIndex,
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [hasLoadedHistory, setHasLoadedHistory] = useState(false);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -56,12 +57,37 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [showDocumentationDropdown, setShowDocumentationDropdown] = useState(false);
+  const [documentationQuery, setDocumentationQuery] = useState('');
+  const [isDownloadingDocumentation, setIsDownloadingDocumentation] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    try {
+      const savedMessages = window.localStorage.getItem(`repomind-chat-${repositoryId}`);
+      if (savedMessages) setMessages(JSON.parse(savedMessages));
+    } catch {
+      window.localStorage.removeItem(`repomind-chat-${repositoryId}`);
+    } finally {
+      setHasLoadedHistory(true);
+    }
+  }, [repositoryId]);
+
+  useEffect(() => {
+    if (hasLoadedHistory) {
+      window.localStorage.setItem(`repomind-chat-${repositoryId}`, JSON.stringify(messages));
+    }
+  }, [hasLoadedHistory, messages, repositoryId]);
+
   // Filtered files for autocomplete
-  const filteredFiles = availableFiles.filter((f) =>
-    f.toLowerCase().includes(filterQuery.toLowerCase())
-  );
+  const filteredFiles = availableFiles
+    .filter((f) => f.toLowerCase().includes(filterQuery.toLowerCase()))
+    .slice(0, 10);
+
+  const documentationFiles = availableFiles
+    .filter((f) => f.toLowerCase().includes(documentationQuery.toLowerCase()))
+    .slice(0, 10);
+  const documentationSuggestions: (string | undefined)[] = [undefined, ...documentationFiles];
 
   const updateMentionState = (value: string, cursorPosition: number) => {
     const textBeforeCursor = value.slice(0, cursorPosition);
@@ -71,10 +97,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       setFilterQuery(mentionMatch[1]);
       setSelectedIndex(0);
       setShowDropdown(true);
+      setShowDocumentationDropdown(false);
+      return;
+    }
+
+    const documentationMatch = textBeforeCursor.match(/(?:^|\s)\/([^\s]*)$/);
+    if (documentationMatch) {
+      setDocumentationQuery(documentationMatch[1]);
+      setSelectedIndex(0);
+      setShowDocumentationDropdown(true);
+      setShowDropdown(false);
       return;
     }
 
     setShowDropdown(false);
+    setShowDocumentationDropdown(false);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,23 +137,52 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
 
     setShowDropdown(false);
+    setShowDocumentationDropdown(false);
     inputRef.current?.focus();
   };
 
+  const handleDownloadDocumentation = async (path?: string) => {
+    setIsDownloadingDocumentation(true);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      const query = path ? `?path=${encodeURIComponent(path)}` : '';
+      const response = await fetch(
+        `${baseUrl}/repositories/${repositoryId}/documentation${query}`
+      );
+      if (!response.ok) return;
+
+      const markdown = await response.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(markdown);
+      link.download = path ? `${path.split('/').pop()}.md` : 'repomind-documentation.md';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } finally {
+      setIsDownloadingDocumentation(false);
+      setShowDocumentationDropdown(false);
+      setInput('');
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!showDropdown || filteredFiles.length === 0) return;
+    const suggestions = showDropdown ? filteredFiles : documentationSuggestions;
+    if ((!showDropdown && !showDocumentationDropdown) || suggestions.length === 0) return;
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1) % Math.min(filteredFiles.length, 6));
+      setSelectedIndex((prev) => (prev + 1) % suggestions.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 + Math.min(filteredFiles.length, 6)) % Math.min(filteredFiles.length, 6));
+      setSelectedIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
     } else if (e.key === 'Enter' && showDropdown) {
       e.preventDefault();
       handleSelectFile(filteredFiles[selectedIndex]);
+    } else if (e.key === 'Enter' && showDocumentationDropdown) {
+      e.preventDefault();
+      handleDownloadDocumentation(documentationSuggestions[selectedIndex]);
     } else if (e.key === 'Escape') {
       setShowDropdown(false);
+      setShowDocumentationDropdown(false);
     }
   };
 
@@ -327,6 +393,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
       {/* Input Form */}
       <div className="p-4 border-t border-zinc-800 bg-zinc-950/80 relative">
+        {messages.length > 0 && (
+          <div className="mb-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setMessages([])}
+              className="inline-flex items-center gap-1.5 px-2 py-1 text-[10px] text-zinc-500 hover:text-red-300 transition"
+              title="Start a new chat"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>New chat</span>
+            </button>
+          </div>
+        )}
         {/* Modern @ Autocomplete Dropdown */}
         {showDropdown && filteredFiles.length > 0 && (
           <div className="absolute bottom-full left-4 right-4 mb-2 max-h-56 overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl z-50">
@@ -334,7 +413,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               <span>Matching Files</span>
               <span>Use ↑ ↓ to navigate, Enter to pin</span>
             </div>
-            {filteredFiles.slice(0, 6).map((file, i) => (
+            {filteredFiles.map((file, i) => (
               <button
                 key={i}
                 type="button"
@@ -352,6 +431,39 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <span className="text-[10px] opacity-70">Pin</span>
               </button>
             ))}
+          </div>
+        )}
+
+        {showDocumentationDropdown && (
+          <div className="absolute bottom-full left-4 right-4 mb-2 overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl z-50">
+            <div className="px-3 py-2 text-[10px] text-zinc-400 font-semibold uppercase border-b border-zinc-800 flex justify-between">
+              <span>Download Markdown</span>
+              <span>Use ↑ ↓ to choose, Enter to download</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleDownloadDocumentation()}
+              className={`w-full text-left px-3 py-2.5 text-xs transition ${
+                selectedIndex === 0 ? 'bg-blue-600 text-white' : 'text-zinc-300 hover:bg-zinc-800/80'
+              }`}
+            >
+              Whole codebase documentation
+            </button>
+            {documentationFiles.map((file, i) => (
+              <button
+                key={file}
+                type="button"
+                onClick={() => handleDownloadDocumentation(file)}
+                className={`w-full text-left px-3 py-2.5 text-xs font-mono transition ${
+                  selectedIndex === i + 1 ? 'bg-blue-600 text-white' : 'text-zinc-300 hover:bg-zinc-800/80'
+                }`}
+              >
+                {file}
+              </button>
+            ))}
+            {isDownloadingDocumentation && (
+              <div className="px-3 py-2 text-[10px] text-zinc-500">Preparing download...</div>
+            )}
           </div>
         )}
 
@@ -399,7 +511,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             value={input}
             onChange={handleInputChange}
             onClick={(e) => updateMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length)}
-            onKeyUp={(e) => updateMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length)}
             onKeyDown={handleKeyDown}
             disabled={status !== 'READY'}
             placeholder={
