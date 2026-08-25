@@ -12,10 +12,11 @@ from app.schemas.file import FileListResponse, FileItemResponse
 from app.schemas.retrieval import RetrievalQueryRequest, RetrievalResponse, RetrievedChunkResponse
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.core.security import validate_and_parse_github_url
-from app.core.errors import AppException
+from app.core.errors import AppException, NotFoundException
 from app.ingestion.orchestrator import IngestionService
 from app.retrieval.hybrid_retriever import HybridRetriever
 from app.services.chat_service import ChatService
+from app.models.chunk import CodeChunk
 
 router = APIRouter()
 
@@ -176,13 +177,41 @@ async def get_file_content(
     path: str = Query(..., description="Relative file path"),
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = select(File).where(File.repository_id == repository_id, File.path == path)
+    # 1. Fetch the file metadata record
+    stmt = select(File).where(
+        File.repository_id == repository_id,
+        File.path == path.strip().lstrip("/")
+    )
     result = await db.execute(stmt)
     file_record = result.scalar_one_or_none()
+
     if not file_record:
         raise NotFoundException(message=f"File '{path}' not found in repository.")
-    
-    return {"path": file_record.path, "language": file_record.language, "content": file_record.content}
+
+    # 2. Fetch all code chunks for this file ordered by start_line
+    chunk_stmt = (
+        select(CodeChunk)
+        .where(CodeChunk.file_id == file_record.id)
+        .order_by(CodeChunk.start_line.asc())
+    )
+    chunk_result = await db.execute(chunk_stmt)
+    chunks = chunk_result.scalars().all()
+
+    if not chunks:
+        file_content = "// No code chunks available for this file."
+    else:
+        # Deduplicate and join chunks in sequential order
+        content_blocks = []
+        for c in chunks:
+            if c.content and (not content_blocks or content_blocks[-1] != c.content):
+                content_blocks.append(c.content)
+        file_content = "\n\n".join(content_blocks)
+
+    return {
+        "path": file_record.path,
+        "language": getattr(file_record, "language", "text") or "text",
+        "content": file_content
+    }
 
 
 @router.post("/{repo_id}/chat", response_model=ChatResponse)
