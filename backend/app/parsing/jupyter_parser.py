@@ -2,7 +2,6 @@
 
 import json
 import logging
-from typing import List
 
 from app.parsing.base import RawChunk
 from app.parsing.python_parser import PythonASTParser
@@ -11,16 +10,13 @@ logger = logging.getLogger(__name__)
 
 
 class JupyterNotebookParser:
-    def parse(self, raw_json_str: str) -> List[RawChunk]:
-        chunks: List[RawChunk] = []
+    def parse(self, raw_json_str: str) -> list[RawChunk]:
+        chunks: list[RawChunk] = []
 
         try:
             data = json.loads(raw_json_str)
         except Exception as exc:
-            logger.warning(
-                f"Malformed Jupyter notebook JSON: {exc}. "
-                "Falling back to raw text."
-            )
+            logger.warning(f"Malformed Jupyter notebook JSON: {exc}. Falling back to raw text.")
 
             return [
                 RawChunk(
@@ -42,11 +38,7 @@ class JupyterNotebookParser:
             cell_type = cell.get("cell_type", "code")
             source = cell.get("source", "")
 
-            cell_text = (
-                "".join(source)
-                if isinstance(source, list)
-                else str(source)
-            )
+            cell_text = "".join(source) if isinstance(source, list) else str(source)
 
             if not cell_text.strip():
                 continue
@@ -65,9 +57,7 @@ class JupyterNotebookParser:
                         chunk.start_line += current_line - 1
                         chunk.end_line += current_line - 1
 
-                        chunk.parent_symbol = (
-                            f"Cell[{idx + 1}:code]"
-                        )
+                        chunk.parent_symbol = f"Cell[{idx + 1}:code]"
 
                         chunk.language = "Python"
 
@@ -110,7 +100,7 @@ class JupyterNotebookParser:
         return chunks
 
 
-def parse_jupyter_notebook(raw_json_str: str) -> List[RawChunk]:
+def parse_jupyter_notebook(raw_json_str: str) -> list[RawChunk]:
     """
     Parse a Jupyter notebook JSON string into RawChunk objects.
     """

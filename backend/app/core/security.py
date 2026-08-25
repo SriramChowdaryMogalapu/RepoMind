@@ -1,9 +1,9 @@
 # backend/app/core/security.py
-import re
 import ipaddress
+import re
 import socket
-from typing import Optional
 from urllib.parse import urlparse
+
 from pydantic import BaseModel
 
 
@@ -19,14 +19,30 @@ GITHUB_URL_REGEX = re.compile(
 )
 
 RESERVED_NAMES = {
-    "settings", "organizations", "orgs", "explore", "trending", 
-    "features", "topics", "collections", "events", "readme", "pricing",
-    "site", "security", "contact", "about", "login", "join"
+    "settings",
+    "organizations",
+    "orgs",
+    "explore",
+    "trending",
+    "features",
+    "topics",
+    "collections",
+    "events",
+    "readme",
+    "pricing",
+    "site",
+    "security",
+    "contact",
+    "about",
+    "login",
+    "join",
 }
 
 # Regex patterns for common sensitive keys, API tokens, private keys
 SECRET_PATTERNS = [
-    re.compile(r"(?i)(api[_-]?key|secret|token|password|auth|bearer)\s*[:=]\s*['\"]?([a-zA-Z0-9_\-\.]{8,})['\"]?"),
+    re.compile(
+        r"(?i)(api[_-]?key|secret|token|password|auth|bearer)\s*[:=]\s*['\"]?([a-zA-Z0-9_\-\.]{8,})['\"]?"
+    ),
     re.compile(r"ghp_[a-zA-Z0-9]{36}"),
     re.compile(r"github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59}"),
     re.compile(r"sk-[a-zA-Z0-9]{20,48}"),
@@ -45,14 +61,18 @@ def validate_and_parse_github_url(url: str) -> ParsedGitHubURL:
     clean_url = url.strip()
     match = GITHUB_URL_REGEX.match(clean_url)
     if not match:
-        raise ValueError("Invalid GitHub repository URL format. Example: https://github.com/owner/repository")
+        raise ValueError(
+            "Invalid GitHub repository URL format. Example: https://github.com/owner/repository"
+        )
 
     owner = match.group("owner")
     repo = match.group("repo")
 
     # Reject reserved paths or malformed segments
     if owner.lower() in RESERVED_NAMES:
-        raise ValueError(f"'{owner}' is a reserved GitHub namespace and not a valid repository owner.")
+        raise ValueError(
+            f"'{owner}' is a reserved GitHub namespace and not a valid repository owner."
+        )
 
     if owner.startswith("-") or owner.endswith("-") or repo.startswith("-") or repo.endswith("-"):
         raise ValueError("Owner and repository names cannot start or end with a hyphen.")
@@ -64,10 +84,7 @@ def validate_and_parse_github_url(url: str) -> ParsedGitHubURL:
     normalized_url = f"https://github.com/{owner}/{repo}"
 
     return ParsedGitHubURL(
-        owner=owner,
-        repo=repo,
-        full_name=full_name,
-        normalized_url=normalized_url
+        owner=owner, repo=repo, full_name=full_name, normalized_url=normalized_url
     )
 
 
@@ -89,17 +106,18 @@ def is_safe_external_url(url: str) -> bool:
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"}:
             return False
-        
+
         hostname = parsed.hostname
-        if not hostname or hostname.lower() not in {"github.com", "raw.githubusercontent.com", "api.github.com"}:
+        if not hostname or hostname.lower() not in {
+            "github.com",
+            "raw.githubusercontent.com",
+            "api.github.com",
+        }:
             return False
 
         # Resolve hostname and reject private/loopback/link-local IP addresses
         ip = socket.gethostbyname(hostname)
         ip_obj = ipaddress.ip_address(ip)
-        if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local:
-            return False
-
-        return True
+        return not (ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local)
     except Exception:
         return False

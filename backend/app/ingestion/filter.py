@@ -1,32 +1,96 @@
 # backend/app/ingestion/filter.py
 import os
-from typing import Set
 
-IGNORED_DIRECTORIES: Set[str] = {
-    ".git", ".github", "node_modules", "dist", "build", "coverage",
-    "__pycache__", ".venv", "venv", "env", "target", "vendor",
-    ".next", ".cache", ".idea", ".vscode", "bin", "obj", ".turbo",
-    "out", "public", ".gradle", ".pipeline"
+IGNORED_DIRECTORIES: set[str] = {
+    ".git",
+    ".github",
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "env",
+    "target",
+    "vendor",
+    ".next",
+    ".cache",
+    ".idea",
+    ".vscode",
+    "bin",
+    "obj",
+    ".turbo",
+    "out",
+    "public",
+    ".gradle",
+    ".pipeline",
 }
 
-IGNORED_EXTENSIONS: Set[str] = {
+IGNORED_EXTENSIONS: set[str] = {
     # Binaries & executables
-    ".exe", ".dll", ".so", ".dylib", ".bin", ".iso", ".dmg", ".class", ".pyc", ".o", ".a",
+    ".exe",
+    ".dll",
+    ".so",
+    ".dylib",
+    ".bin",
+    ".iso",
+    ".dmg",
+    ".class",
+    ".pyc",
+    ".o",
+    ".a",
     # Images & Media
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico", ".mp4", ".mov", ".avi", ".mp3", ".wav",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".svg",
+    ".ico",
+    ".mp4",
+    ".mov",
+    ".avi",
+    ".mp3",
+    ".wav",
     # Archives & Compressed
-    ".zip", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz",
+    ".zip",
+    ".tar",
+    ".gz",
+    ".7z",
+    ".rar",
+    ".bz2",
+    ".xz",
     # Fonts
-    ".ttf", ".woff", ".woff2", ".eot", ".otf",
+    ".ttf",
+    ".woff",
+    ".woff2",
+    ".eot",
+    ".otf",
     # Data dumps & huge binaries
-    ".sqlite", ".db", ".parquet", ".pkl", ".h5", ".onnx",
+    ".sqlite",
+    ".db",
+    ".parquet",
+    ".pkl",
+    ".h5",
+    ".onnx",
     # Lockfiles and minified code
-    ".lock", ".map", ".min.js", ".min.css", ".bundle.js"
+    ".lock",
+    ".map",
+    ".min.js",
+    ".min.css",
+    ".bundle.js",
 }
 
-IGNORED_EXACT_FILES: Set[str] = {
-    "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock",
-    "Pipfile.lock", "Cargo.lock", "composer.lock", "go.sum"
+IGNORED_EXACT_FILES: set[str] = {
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "poetry.lock",
+    "Pipfile.lock",
+    "Cargo.lock",
+    "composer.lock",
+    "go.sum",
 }
 
 SUPPORTED_EXTENSIONS = {

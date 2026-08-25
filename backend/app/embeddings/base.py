@@ -1,6 +1,5 @@
 # backend/app/embeddings/base.py
 from abc import ABC, abstractmethod
-from typing import List
 
 
 class EmbeddingProvider(ABC):
@@ -13,14 +12,11 @@ class EmbeddingProvider(ABC):
     @abstractmethod
     def dimension(self) -> int:
         """Returns the vector dimensionality produced by this model."""
-        pass
 
     @abstractmethod
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """Generate embedding vector for a single string."""
-        pass
 
     @abstractmethod
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embedding vectors for a batch of strings."""
-        pass

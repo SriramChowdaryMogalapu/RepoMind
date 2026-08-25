@@ -1,8 +1,9 @@
 # backend/app/schemas/repository.py
-from pydantic import BaseModel, HttpUrl, Field
-from typing import Optional
 from datetime import datetime
 from uuid import UUID
+
+from pydantic import BaseModel, Field
+
 from app.models.repository import RepositoryStatus
 
 
@@ -17,15 +18,15 @@ class RepositoryResponse(BaseModel):
     full_name: str
     url: str
     default_branch: str
-    description: Optional[str] = None
-    language: Optional[str] = None
+    description: str | None = None
+    language: str | None = None
     stars: int = 0
     forks: int = 0
     status: RepositoryStatus
-    error_message: Optional[str] = None
+    error_message: str | None = None
     file_count: int = 0
     chunk_count: int = 0
-    indexed_at: Optional[datetime] = None
+    indexed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -38,4 +39,4 @@ class RepositoryStatusResponse(BaseModel):
     status: RepositoryStatus
     file_count: int
     chunk_count: int
-    error_message: Optional[str] = None
+    error_message: str | None = None

@@ -1,10 +1,12 @@
 # backend/tests/test_rag.py
-import pytest
 import uuid
-from app.retrieval.base import RetrievedChunk
-from app.llm.context_builder import build_rag_messages, SYSTEM_PROMPT
-from app.llm.mock_provider import MockLLMProvider
+
+import pytest
+
+from app.llm.context_builder import build_rag_messages
 from app.llm.factory import get_llm_provider
+from app.llm.mock_provider import MockLLMProvider
+from app.retrieval.base import RetrievedChunk
 
 
 @pytest.mark.asyncio
@@ -24,7 +26,7 @@ async def test_rag_context_building_and_mock_generation():
             symbol_name="decode_token",
             symbol_type="function",
             score=0.92,
-            retrieval_method="hybrid"
+            retrieval_method="hybrid",
         )
     ]
 

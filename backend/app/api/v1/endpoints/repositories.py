@@ -1,22 +1,31 @@
 # backend/app/api/v1/endpoints/repositories.py
-from fastapi import APIRouter, Depends, status, BackgroundTasks, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 from uuid import UUID
 
-from app.db.session import get_db, AsyncSessionLocal
-from app.models.repository import Repository, RepositoryStatus
-from app.models.file import File
-from app.schemas.repository import RepositoryCreateRequest, RepositoryResponse, RepositoryStatusResponse
-from app.schemas.file import FileListResponse, FileItemResponse
-from app.schemas.retrieval import RetrievalQueryRequest, RetrievalResponse, RetrievedChunkResponse
-from app.schemas.chat import ChatRequest, ChatResponse
-from app.core.security import validate_and_parse_github_url
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+
 from app.core.errors import AppException, NotFoundException
+from app.core.security import validate_and_parse_github_url
+from app.db.session import AsyncSessionLocal, get_db
 from app.ingestion.orchestrator import IngestionService
-from app.retrieval.hybrid_retriever import HybridRetriever
-from app.services.chat_service import ChatService
 from app.models.chunk import CodeChunk
+from app.models.file import File
+from app.models.repository import Repository, RepositoryStatus
+from app.retrieval.hybrid_retriever import HybridRetriever
+from app.schemas.chat import ChatRequest, ChatResponse
+from app.schemas.file import FileItemResponse, FileListResponse
+from app.schemas.repository import (
+    RepositoryCreateRequest,
+    RepositoryResponse,
+    RepositoryStatusResponse,
+)
+from app.schemas.retrieval import (
+    RetrievalQueryRequest,
+    RetrievalResponse,
+    RetrievedChunkResponse,
+)
+from app.services.chat_service import ChatService
 
 router = APIRouter()
 
@@ -28,14 +37,13 @@ async def run_ingestion_task(repo_id: UUID, db_factory):
 
 
 @router.post("", response_model=RepositoryResponse, status_code=status.HTTP_201_CREATED)
-async def register_repository(
-    payload: RepositoryCreateRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def register_repository(payload: RepositoryCreateRequest, db: AsyncSession = Depends(get_db)):
     try:
         parsed = validate_and_parse_github_url(payload.url)
     except ValueError as e:
-        raise AppException(code="INVALID_URL", message=str(e), status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        raise AppException(
+            code="INVALID_URL", message=str(e), status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
+        ) from e
 
     stmt = select(Repository).where(Repository.full_name == parsed.full_name)
     result = await db.execute(stmt)
@@ -49,7 +57,7 @@ async def register_repository(
         name=parsed.repo,
         full_name=parsed.full_name,
         url=parsed.normalized_url,
-        status=RepositoryStatus.PENDING
+        status=RepositoryStatus.PENDING,
     )
     db.add(new_repo)
     await db.flush()
@@ -63,7 +71,11 @@ async def get_repository(repo_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(stmt)
     repo = result.scalars().first()
     if not repo:
-        raise AppException(code="REPOSITORY_NOT_FOUND", message="Repository was not found.", status_code=status.HTTP_404_NOT_FOUND)
+        raise AppException(
+            code="REPOSITORY_NOT_FOUND",
+            message="Repository was not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
     return repo
 
 
@@ -73,21 +85,23 @@ async def get_repository_status(repo_id: UUID, db: AsyncSession = Depends(get_db
     result = await db.execute(stmt)
     repo = result.scalars().first()
     if not repo:
-        raise AppException(code="REPOSITORY_NOT_FOUND", message="Repository was not found.", status_code=status.HTTP_404_NOT_FOUND)
+        raise AppException(
+            code="REPOSITORY_NOT_FOUND",
+            message="Repository was not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
     return RepositoryStatusResponse(
         id=repo.id,
         status=repo.status,
         file_count=repo.file_count,
         chunk_count=repo.chunk_count,
-        error_message=repo.error_message
+        error_message=repo.error_message,
     )
 
 
 @router.post("/{repo_id}/index", response_model=RepositoryStatusResponse)
 async def trigger_indexing(
-    repo_id: UUID,
-    background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db)
+    repo_id: UUID, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)
 ):
     stmt = select(Repository).where(Repository.id == repo_id)
     result = await db.execute(stmt)
@@ -106,7 +120,7 @@ async def trigger_indexing(
         status=repo.status,
         file_count=repo.file_count,
         chunk_count=repo.chunk_count,
-        error_message=None
+        error_message=None,
     )
 
 
@@ -119,34 +133,30 @@ async def get_repository_files(repo_id: UUID, db: AsyncSession = Depends(get_db)
         repository_id=repo_id,
         total=len(files),
         files=[
-            FileItemResponse(
-                id=f.id,
-                path=f.path,
-                language=f.language,
-                size_bytes=f.size_bytes
-            ) for f in files
-        ]
+            FileItemResponse(id=f.id, path=f.path, language=f.language, size_bytes=f.size_bytes)
+            for f in files
+        ],
     )
 
 
 @router.post("/{repo_id}/retrieve", response_model=RetrievalResponse)
 async def retrieve_code_chunks(
-    repo_id: UUID,
-    payload: RetrievalQueryRequest,
-    db: AsyncSession = Depends(get_db)
+    repo_id: UUID, payload: RetrievalQueryRequest, db: AsyncSession = Depends(get_db)
 ):
     stmt = select(Repository).where(Repository.id == repo_id)
     result = await db.execute(stmt)
     repo = result.scalars().first()
     if not repo:
-        raise AppException(code="REPOSITORY_NOT_FOUND", message="Repository not found.", status_code=404)
+        raise AppException(
+            code="REPOSITORY_NOT_FOUND", message="Repository not found.", status_code=404
+        )
 
     retriever = HybridRetriever(db)
     chunks = await retriever.retrieve(
         repository_id=repo_id,
         query=payload.query,
         top_k=payload.top_k,
-        path_filter=payload.path_filter
+        path_filter=payload.path_filter,
     )
 
     return RetrievalResponse(
@@ -166,21 +176,22 @@ async def retrieve_code_chunks(
                 parent_symbol=c.parent_symbol,
                 score=c.score,
                 retrieval_method=c.retrieval_method,
-                metadata=c.metadata
-            ) for c in chunks
-        ]
+                metadata=c.metadata,
+            )
+            for c in chunks
+        ],
     )
+
 
 @router.get("/{repository_id}/files/content")
 async def get_file_content(
     repository_id: UUID,
     path: str = Query(..., description="Relative file path"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     # 1. Fetch the file metadata record
     stmt = select(File).where(
-        File.repository_id == repository_id,
-        File.path == path.strip().lstrip("/")
+        File.repository_id == repository_id, File.path == path.strip().lstrip("/")
     )
     result = await db.execute(stmt)
     file_record = result.scalar_one_or_none()
@@ -210,15 +221,13 @@ async def get_file_content(
     return {
         "path": file_record.path,
         "language": getattr(file_record, "language", "text") or "text",
-        "content": file_content
+        "content": file_content,
     }
 
 
 @router.post("/{repo_id}/chat", response_model=ChatResponse)
 async def chat_with_repository(
-    repo_id: UUID,
-    payload: ChatRequest,
-    db: AsyncSession = Depends(get_db)
+    repo_id: UUID, payload: ChatRequest, db: AsyncSession = Depends(get_db)
 ):
     service = ChatService(db)
     return await service.answer_question(repository_id=repo_id, request=payload)

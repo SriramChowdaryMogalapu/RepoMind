@@ -1,6 +1,7 @@
 # backend/app/schemas/common.py
+from typing import Any, Generic, TypeVar
+
 from pydantic import BaseModel
-from typing import Optional, Any, Generic, TypeVar, List
 
 T = TypeVar("T")
 
@@ -8,7 +9,7 @@ T = TypeVar("T")
 class ErrorResponse(BaseModel):
     code: str
     message: str
-    details: Optional[Any] = None
+    details: Any | None = None
 
 
 class ErrorEnvelope(BaseModel):
@@ -17,11 +18,11 @@ class ErrorEnvelope(BaseModel):
 
 class SuccessResponse(BaseModel):
     success: bool = True
-    message: Optional[str] = None
+    message: str | None = None
 
 
 class PaginatedResponse(BaseModel, Generic[T]):
-    items: List[T]
+    items: list[T]
     total: int
     page: int
     page_size: int

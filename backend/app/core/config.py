@@ -1,6 +1,6 @@
 # backend/app/core/config.py
 from pathlib import Path
-from typing import List, Optional, Union
+
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # --------------------------------------------------------------------------
     # Optional GitHub Token
     # --------------------------------------------------------------------------
-    GITHUB_TOKEN: Optional[str] = None
+    GITHUB_TOKEN: str | None = None
 
     # --------------------------------------------------------------------------
     # AI Provider & Model Configuration
@@ -40,8 +40,8 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
 
     # API Keys (Loaded from .env)
-    LLM_API_KEY: Optional[str] = None
-    OPENAI_API_KEY: Optional[str] = None
+    LLM_API_KEY: str | None = None
+    OPENAI_API_KEY: str | None = None
 
     # --------------------------------------------------------------------------
     # Security, Limits & CORS
@@ -50,11 +50,11 @@ class Settings(BaseSettings):
     MAX_FILES: int = 5000
     MAX_FILE_SIZE_KB: int = 500
     RATE_LIMIT_PER_MINUTE: int = 60
-    CORS_ORIGINS: List[str] = ["https://repo-mind-git-main-msrc.vercel.app"]
+    CORS_ORIGINS: list[str] = ["https://repo-mind-git-main-msrc.vercel.app"]
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
-    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+    def assemble_cors_origins(cls, v: str | list[str]) -> list[str]:
         if isinstance(v, str) and not v.startswith("["):
             return [i.strip() for i in v.split(",")]
         elif isinstance(v, list):
@@ -97,10 +97,7 @@ class Settings(BaseSettings):
         return self
 
     model_config = SettingsConfigDict(
-        env_file=str(ENV_FILE),
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-        extra="ignore"
+        env_file=str(ENV_FILE), env_file_encoding="utf-8", case_sensitive=True, extra="ignore"
     )
 
 

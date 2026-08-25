@@ -2,20 +2,20 @@
 import hashlib
 from datetime import datetime
 from uuid import UUID
-from typing import List
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.models.repository import Repository, RepositoryStatus
-from app.models.file import File
-from app.models.chunk import CodeChunk
-from app.services.github import GitHubClient
-from app.ingestion.filter import is_file_supported, detect_language
-from app.parsing.dispatcher import parse_file_to_chunks
-from app.embeddings.factory import get_embedding_provider
 from app.core.config import settings
 from app.core.errors import AppException
+from app.embeddings.factory import get_embedding_provider
+from app.ingestion.filter import detect_language, is_file_supported
+from app.models.chunk import CodeChunk
+from app.models.file import File
+from app.models.repository import Repository, RepositoryStatus
+from app.parsing.dispatcher import parse_file_to_chunks
+from app.services.github import GitHubClient
 
 
 class IngestionService:
@@ -25,7 +25,11 @@ class IngestionService:
         self.embedding_provider = get_embedding_provider()
 
     async def start_ingestion(self, repository_id: UUID) -> Repository:
-        stmt = select(Repository).where(Repository.id == repository_id).options(selectinload(Repository.files))
+        stmt = (
+            select(Repository)
+            .where(Repository.id == repository_id)
+            .options(selectinload(Repository.files))
+        )
         res = await self.db.execute(stmt)
         repo = res.scalars().first()
 
@@ -56,7 +60,9 @@ class IngestionService:
 
             if len(valid_files) > settings.MAX_FILES:
                 repo.status = RepositoryStatus.FAILED
-                repo.error_message = f"Repository exceeds maximum file count limit of {settings.MAX_FILES}."
+                repo.error_message = (
+                    f"Repository exceeds maximum file count limit of {settings.MAX_FILES}."
+                )
                 await self.db.commit()
                 return repo
 
@@ -76,25 +82,25 @@ class IngestionService:
                     path=path,
                     language=lang,
                     size_bytes=size,
-                    file_hash=file_hash
+                    file_hash=file_hash,
                 )
                 file_entities.append(new_file)
                 self.db.add(new_file)
 
             repo.file_count = len(file_entities)
-            
+
             # Stage 2: PARSING & CHUNKING
             repo.status = RepositoryStatus.PARSING
             await self.db.commit()
             await self.db.refresh(repo)
 
-            all_chunks: List[CodeChunk] = []
+            all_chunks: list[CodeChunk] = []
             for file_obj in file_entities:
                 content = await self.github.fetch_file_content(
                     owner=repo.owner,
                     repo=repo.name,
                     path=file_obj.path,
-                    default_branch=repo.default_branch
+                    default_branch=repo.default_branch,
                 )
                 if not content:
                     continue
@@ -110,7 +116,7 @@ class IngestionService:
                         symbol_name=r_chunk.symbol_name,
                         symbol_type=r_chunk.symbol_type,
                         parent_symbol=r_chunk.parent_symbol,
-                        chunk_metadata=r_chunk.metadata
+                        chunk_metadata=r_chunk.metadata,
                     )
                     self.db.add(chunk)
                     all_chunks.append(chunk)
@@ -124,10 +130,10 @@ class IngestionService:
             if all_chunks:
                 batch_size = settings.EMBEDDING_BATCH_SIZE
                 for i in range(0, len(all_chunks), batch_size):
-                    batch = all_chunks[i:i + batch_size]
+                    batch = all_chunks[i : i + batch_size]
                     batch_texts = [c.content for c in batch]
                     embeddings = await self.embedding_provider.embed_batch(batch_texts)
-                    for chunk, emb in zip(batch, embeddings):
+                    for chunk, emb in zip(batch, embeddings, strict=False):
                         chunk.embedding = emb
 
             # Stage 4: READY

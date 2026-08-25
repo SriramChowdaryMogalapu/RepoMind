@@ -1,7 +1,7 @@
 # backend/app/llm/context_builder.py
-from typing import List, Tuple
-from app.retrieval.base import RetrievedChunk
+
 from app.llm.base import LLMMessage
+from app.retrieval.base import RetrievedChunk
 
 # backend/app/llm/context_builder.py
 
@@ -30,16 +30,14 @@ RESPONSE FORMAT:
 
 
 def build_rag_messages(
-    query: str,
-    retrieved_chunks: List[RetrievedChunk],
-    max_context_chars: int = 15000
-) -> Tuple[List[LLMMessage], List[RetrievedChunk]]:
+    query: str, retrieved_chunks: list[RetrievedChunk], max_context_chars: int = 15000
+) -> tuple[list[LLMMessage], list[RetrievedChunk]]:
     """
     Constructs the grounded prompt payload while enforcing context size limits.
     Returns the message history and the subset of chunks that fit within the context budget.
     """
-    used_chunks: List[RetrievedChunk] = []
-    context_sections: List[str] = []
+    used_chunks: list[RetrievedChunk] = []
+    context_sections: list[str] = []
     current_char_count = 0
 
     for chunk in retrieved_chunks:
@@ -72,7 +70,7 @@ def build_rag_messages(
 
     messages = [
         LLMMessage(role="system", content=SYSTEM_PROMPT),
-        LLMMessage(role="user", content=user_content)
+        LLMMessage(role="user", content=user_content),
     ]
 
     return messages, used_chunks

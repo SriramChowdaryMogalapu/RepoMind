@@ -1,9 +1,7 @@
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
@@ -11,7 +9,6 @@ from alembic import context
 # Import application settings and declarative models
 from app.core.config import settings
 from app.db.session import Base
-from app.models import repository, file, chunk  # Ensures all models are registered
 
 # Alembic Config object
 config = context.config
@@ -60,7 +57,6 @@ async def run_async_migrations() -> None:
         pool_pre_ping=True,
         connect_args={"statement_cache_size": 0},
     )
-
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

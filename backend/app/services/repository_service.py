@@ -1,16 +1,14 @@
 # backend/app/services/repository_service.py
 from uuid import UUID
-from typing import Optional, List
+
+from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
 
-from app.models.repository import Repository, RepositoryStatus
-from app.models.file import File
-from app.models.chunk import CodeChunk
-from app.core.security import validate_and_parse_github_url
 from app.core.errors import AppException
-from fastapi import status
+from app.core.security import validate_and_parse_github_url
+from app.models.file import File
+from app.models.repository import Repository, RepositoryStatus
 
 
 class RepositoryService:
@@ -25,11 +23,11 @@ class RepositoryService:
             raise AppException(
                 code="REPOSITORY_NOT_FOUND",
                 message="The requested repository does not exist.",
-                status_code=status.HTTP_404_NOT_FOUND
+                status_code=status.HTTP_404_NOT_FOUND,
             )
         return repo
 
-    async def get_by_full_name(self, full_name: str) -> Optional[Repository]:
+    async def get_by_full_name(self, full_name: str) -> Repository | None:
         stmt = select(Repository).where(Repository.full_name == full_name.lower())
         result = await self.db.execute(stmt)
         return result.scalars().first()
@@ -46,14 +44,14 @@ class RepositoryService:
             name=parsed.repo,
             full_name=parsed.full_name,
             url=parsed.normalized_url,
-            status=RepositoryStatus.PENDING
+            status=RepositoryStatus.PENDING,
         )
         self.db.add(new_repo)
         await self.db.flush()
         await self.db.refresh(new_repo)
         return new_repo
 
-    async def list_repositories(self, limit: int = 50, offset: int = 0) -> List[Repository]:
+    async def list_repositories(self, limit: int = 50, offset: int = 0) -> list[Repository]:
         stmt = select(Repository).order_by(Repository.created_at.desc()).offset(offset).limit(limit)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
@@ -64,12 +62,12 @@ class RepositoryService:
         await self.db.commit()
         return True
 
-    async def get_repository_files(self, repo_id: UUID) -> List[File]:
+    async def get_repository_files(self, repo_id: UUID) -> list[File]:
         stmt = select(File).where(File.repository_id == repo_id).order_by(File.path.asc())
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_file_by_path(self, repo_id: UUID, path: str) -> Optional[File]:
+    async def get_file_by_path(self, repo_id: UUID, path: str) -> File | None:
         stmt = select(File).where(File.repository_id == repo_id, File.path == path)
         result = await self.db.execute(stmt)
         return result.scalars().first()

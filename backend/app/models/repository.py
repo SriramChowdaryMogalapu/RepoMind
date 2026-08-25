@@ -2,13 +2,15 @@
 import enum
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime, Enum, Text
+
+from sqlalchemy import Column, DateTime, Enum, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+
 from app.db.session import Base
 
 
-class RepositoryStatus(str, enum.Enum):
+class RepositoryStatus(enum.StrEnum):
     PENDING = "PENDING"
     CLONING = "CLONING"
     PARSING = "PARSING"
@@ -31,13 +33,13 @@ class Repository(Base):
     stars = Column(Integer, default=0)
     forks = Column(Integer, default=0)
     status = Column(
-    Enum(
-        RepositoryStatus,
-        name="repository_status",
-    ),
-    default=RepositoryStatus.PENDING,
-    nullable=False,
-    index=True,
+        Enum(
+            RepositoryStatus,
+            name="repository_status",
+        ),
+        default=RepositoryStatus.PENDING,
+        nullable=False,
+        index=True,
     )
     error_message = Column(Text, nullable=True)
     file_count = Column(Integer, default=0)

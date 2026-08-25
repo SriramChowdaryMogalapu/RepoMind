@@ -1,5 +1,5 @@
 # backend/tests/test_filter.py
-from app.ingestion.filter import is_file_supported, detect_language
+from app.ingestion.filter import detect_language, is_file_supported
 
 
 def test_supported_files():
@@ -41,7 +41,7 @@ def test_language_detection():
         ("test.py", "Python"),
         ("app/main.ts", "TypeScript"),
         ("styles.css", "CSS"),
-        ("unknown.xyz", "Unknown")
+        ("unknown.xyz", "Unknown"),
     ]
     for path, expected in cases:
         lang = detect_language(path)

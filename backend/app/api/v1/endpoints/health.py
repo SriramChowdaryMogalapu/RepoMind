@@ -1,10 +1,10 @@
 # backend/app/api/v1/endpoints/health.py
 from fastapi import APIRouter, Depends, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
 from app.core.config import settings
+from app.db.session import get_db
 
 router = APIRouter()
 
@@ -15,7 +15,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": settings.PROJECT_NAME,
-        "environment": settings.ENVIRONMENT
+        "environment": settings.ENVIRONMENT,
     }
 
 
@@ -28,7 +28,7 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
     try:
         await db.execute(text("SELECT 1"))
     except Exception as e:
-        db_status = f"unhealthy: {str(e)}"
+        db_status = f"unhealthy: {e!s}"
 
     try:
         result = await db.execute(text("SELECT extname FROM pg_extension WHERE extname = 'vector'"))
@@ -36,12 +36,8 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
         if not row:
             vector_status = "extension_missing"
     except Exception as e:
-        vector_status = f"unhealthy: {str(e)}"
+        vector_status = f"unhealthy: {e!s}"
 
     is_ready = db_status == "connected" and vector_status == "available"
 
-    return {
-        "ready": is_ready,
-        "database": db_status,
-        "pgvector": vector_status
-    }
+    return {"ready": is_ready, "database": db_status, "pgvector": vector_status}

@@ -1,7 +1,8 @@
 # backend/tests/test_embeddings.py
 import pytest
-from app.embeddings.mock_provider import MockEmbeddingProvider
+
 from app.embeddings.factory import get_embedding_provider
+from app.embeddings.mock_provider import MockEmbeddingProvider
 
 
 @pytest.mark.asyncio
@@ -14,7 +15,7 @@ async def test_mock_embedding_generation():
     text = "def authenticate_user(token: str): return True"
     print(f"[TEST] Generating single embedding for code: '{text}'")
     emb = await provider.embed_text(text)
-    
+
     assert len(emb) == 1536
     assert isinstance(emb[0], float)
     print(f"[TEST] Output vector sample (first 5 elements): {emb[:5]}")
@@ -29,11 +30,7 @@ async def test_mock_embedding_generation():
 async def test_mock_batch_embeddings():
     print("\n[TEST] Testing batch embedding generation...")
     provider = MockEmbeddingProvider(dimension=1536)
-    texts = [
-        "import os",
-        "class DatabaseConnection:",
-        "def query_database(sql: str): pass"
-    ]
+    texts = ["import os", "class DatabaseConnection:", "def query_database(sql: str): pass"]
     print(f"[TEST] Embedding batch of {len(texts)} items.")
     results = await provider.embed_batch(texts)
 

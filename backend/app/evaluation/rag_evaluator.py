@@ -1,14 +1,14 @@
 # backend/app/evaluation/rag_evaluator.py
 from dataclasses import dataclass
-from typing import List, Optional
+
 from pydantic import BaseModel
 
 
 class EvalTestCase(BaseModel):
     id: str
     query: str
-    expected_files: List[str]
-    expected_symbols: Optional[List[str]] = None
+    expected_files: list[str]
+    expected_symbols: list[str] | None = None
 
 
 @dataclass
@@ -29,8 +29,8 @@ class RAGEvaluator:
 
     @staticmethod
     def evaluate_retrieval(
-        test_cases: List[EvalTestCase],
-        retrieved_results: List[List[str]]  # List of retrieved file paths per query
+        test_cases: list[EvalTestCase],
+        retrieved_results: list[list[str]],  # List of retrieved file paths per query
     ) -> EvalMetrics:
         total = len(test_cases)
         if total == 0:
@@ -43,9 +43,9 @@ class RAGEvaluator:
         precision_5_sum = 0.0
         citation_correct = 0
 
-        for test_case, candidates in zip(test_cases, retrieved_results):
+        for test_case, candidates in zip(test_cases, retrieved_results, strict=False):
             expected = set(test_case.expected_files)
-            
+
             # Hit@1
             if candidates and any(candidates[0].endswith(exp) for exp in expected):
                 hits_1 += 1
@@ -84,5 +84,5 @@ class RAGEvaluator:
             hit_at_5=round(hits_5 / total, 3),
             mrr=round(mrr_sum / total, 3),
             precision_at_5=round(precision_5_sum / total, 3),
-            citation_accuracy=round(citation_correct / total, 3)
+            citation_accuracy=round(citation_correct / total, 3),
         )
