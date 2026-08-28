@@ -7,6 +7,7 @@ from app.llm.context_builder import build_rag_messages
 from app.llm.fallback_provider import MultiProviderFallbackLLM
 from app.llm.factory import get_llm_provider
 from app.llm.mock_provider import MockLLMProvider
+from app.llm.openai_provider import OpenAILLMProvider
 from app.core.config import settings
 from app.retrieval.base import RetrievedChunk
 
@@ -76,6 +77,21 @@ def test_llm_factory_resolution(monkeypatch):
     assert isinstance(provider, MultiProviderFallbackLLM)
     assert any(isinstance(candidate, MockLLMProvider) for candidate in provider.providers)
     print(f"[TEST] Successfully resolved default LLM provider: {type(provider).__name__}")
+
+
+def test_llm_factory_uses_models_in_configured_order(monkeypatch):
+    monkeypatch.setattr(settings, "LLM_PROVIDER", "openai")
+    monkeypatch.setattr(settings, "LLM_MODEL", ["missing-first", "working-second"])
+    monkeypatch.setattr(settings, "LLM_API_KEY", "")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "test-key")
+
+    provider = get_llm_provider()
+
+    assert all(isinstance(candidate, OpenAILLMProvider) for candidate in provider.providers)
+    assert [candidate.model_name for candidate in provider.providers] == [
+        "missing-first",
+        "working-second",
+    ]
 
 
 @pytest.mark.asyncio

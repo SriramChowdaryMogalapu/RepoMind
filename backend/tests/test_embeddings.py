@@ -4,6 +4,7 @@ import pytest
 from app.embeddings.factory import get_embedding_provider
 from app.embeddings.fallback_provider import MultiProviderFallbackEmbedding
 from app.embeddings.mock_provider import MockEmbeddingProvider
+from app.embeddings.openai_provider import OpenAIEmbeddingProvider
 from app.core.config import settings
 
 
@@ -56,3 +57,18 @@ def test_embedding_factory_default(monkeypatch):
     assert isinstance(provider, MultiProviderFallbackEmbedding)
     assert any(isinstance(candidate, MockEmbeddingProvider) for candidate in provider.providers)
     print(f"[TEST] Factory resolved to default provider: {type(provider).__name__}")
+
+
+def test_embedding_factory_uses_models_in_configured_order(monkeypatch):
+    monkeypatch.setattr(settings, "EMBEDDING_PROVIDER", "openai")
+    monkeypatch.setattr(settings, "EMBEDDING_MODEL", ["missing-first", "working-second"])
+    monkeypatch.setattr(settings, "LLM_API_KEY", "")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "test-key")
+
+    provider = get_embedding_provider()
+
+    assert all(isinstance(candidate, OpenAIEmbeddingProvider) for candidate in provider.providers)
+    assert [candidate.model_name for candidate in provider.providers] == [
+        "missing-first",
+        "working-second",
+    ]
