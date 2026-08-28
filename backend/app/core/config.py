@@ -31,12 +31,12 @@ class Settings(BaseSettings):
     # --------------------------------------------------------------------------
     # Embeddings: "mock", "fastembed", "openai", "gemini"
     EMBEDDING_PROVIDER: str = "mock"
-    EMBEDDING_MODEL: str = "gemini-embedding-001"
+    EMBEDDING_MODEL: str | list[str] = "gemini-embedding-001"
     EMBEDDING_BATCH_SIZE: int = 32
 
     # LLM: "mock", "openai", "openrouter", "groq", "anthropic", "gemini"
     LLM_PROVIDER: str = "mock"
-    LLM_MODEL: str = "gemini-1.5-flash"
+    LLM_MODEL: str | list[str] = "gemini-1.5-flash"
     LLM_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
 
     # API Keys (Loaded from .env)

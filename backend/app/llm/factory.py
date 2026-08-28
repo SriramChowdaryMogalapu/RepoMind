@@ -13,6 +13,12 @@ def _is_valid_key(key: str | None) -> bool:
     return bool(k) and not k.startswith("your_") and not k.startswith("sk-proj-your")
 
 
+def _model_names(value: str | list[str] | None, default: str) -> list[str]:
+    """Normalize scalar/list model configuration while preserving its order."""
+    names = [value] if isinstance(value, str) else value or []
+    return [name.strip() for name in names if isinstance(name, str) and name.strip()] or [default]
+
+
 def get_llm_provider() -> BaseLLMProvider:
     providers = []
 
@@ -20,23 +26,28 @@ def get_llm_provider() -> BaseLLMProvider:
     if settings.LLM_PROVIDER == "gemini" and _is_valid_key(settings.LLM_API_KEY):
         from app.llm.gemini_provider import GeminiLLMProvider
 
-        providers.append(
+        providers.extend(
             GeminiLLMProvider(
                 api_key=settings.LLM_API_KEY.strip(),
-                model_name=settings.LLM_MODEL or "gemini-1.5-flash",
+                model_name=model_name,
                 base_url=settings.LLM_BASE_URL,
             )
+            for model_name in _model_names(settings.LLM_MODEL, "gemini-1.5-flash")
         )
 
     # 2. Check OpenAI / Secondary Cloud: Add only if OpenAI key is present
     if _is_valid_key(settings.OPENAI_API_KEY):
         from app.llm.openai_provider import OpenAILLMProvider
 
-        providers.append(
+        providers.extend(
             OpenAILLMProvider(
                 api_key=settings.OPENAI_API_KEY.strip(),
-                model_name="gpt-4o-mini",
+                model_name=model_name,
                 base_url="https://api.openai.com/v1",
+            )
+            for model_name in _model_names(
+                settings.LLM_MODEL if settings.LLM_PROVIDER == "openai" else None,
+                "gpt-4o-mini",
             )
         )
 
@@ -48,12 +59,13 @@ def get_llm_provider() -> BaseLLMProvider:
 
         # Avoid duplicate if already registered via OPENAI_API_KEY
         if not any(isinstance(p, OpenAILLMProvider) for p in providers):
-            providers.append(
+            providers.extend(
                 OpenAILLMProvider(
                     api_key=settings.LLM_API_KEY.strip(),
-                    model_name=settings.LLM_MODEL or "gpt-4o-mini",
+                    model_name=model_name,
                     base_url=getattr(settings, "LLM_BASE_URL", "https://api.openai.com/v1"),
                 )
+                for model_name in _model_names(settings.LLM_MODEL, "gpt-4o-mini")
             )
 
     # 4. Fallback: If no provider keys are configured, use local MockLLMProvider
